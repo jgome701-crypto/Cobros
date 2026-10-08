@@ -29,6 +29,7 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .item{width:100%;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd);display:flex;justify-content:space-between;margin-bottom:8px}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
+<p class="empty" style="text-align:center;font-size:12px;margin:24px 0">versión 2</p>
 <script>
 // === CONFIGURACIÓN: pega aquí la URL de tu Apps Script (termina en /exec) ===
 const API = "https://script.google.com/macros/s/AKfycbz2gYfC_dS3_sWhFByfDpJDGpWp3r1dx3r0-NUzz78j-wHh1RdCPRlHMAUFsWRSKNe6JA/exec";
@@ -99,7 +100,7 @@ async function load(){
   try{const r=await get("pin="+encodeURIComponent(PIN));
     if(r.error){PIN="";try{localStorage.removeItem("pin")}catch(e){}return askPin("PIN incorrecto")}
     L=r.loans;view();
-  }catch(e){$.innerHTML=msg("No se pudo conectar con el servidor.")}
+  }catch(e){$.innerHTML=msg("No se pudo conectar con el servidor.")+"<p class=\"empty\"><small>Detalle técnico: "+esc(e&&e.message)+"</small></p>"}
 }
 async function save(){
   err="";try{const r=await post({action:"save",id:cur.id,loan:cur.loan});if(r.error)throw 0;L[cur.id]=cur.loan}catch(e){err="No se pudo guardar. Revisa tu conexión e intenta de nuevo."}
@@ -134,7 +135,7 @@ $.addEventListener("click",async e=>{
 (async()=>{
   if(!API){$.innerHTML=msg("Falta pegar la URL del servidor (API) en index.html.");return}
   const c=q.get("c");
-  if(c){try{const r=await get("c="+encodeURIComponent(c));if(r.loan){cur={id:c,loan:r.loan};view()}else $.innerHTML=msg("No encontramos este préstamo. Revisa el enlace.")}catch(e){$.innerHTML=msg("No se pudo cargar. Intenta de nuevo.")}return}
+  if(c){try{const r=await get("c="+encodeURIComponent(c));if(r.loan){cur={id:c,loan:r.loan};view()}else $.innerHTML=msg("No encontramos este préstamo. Revisa el enlace.")}catch(e){$.innerHTML=msg("No se pudo cargar. Intenta de nuevo.")+"<p class=\"empty\"><small>Detalle técnico: "+esc(e&&e.message)+"</small></p>"}return}
   owner=true;PIN?load():askPin();
 })();
 </script></body></html>
