@@ -14,50 +14,66 @@ h1{margin:0;font-size:24px}h2{font-size:16px;margin:20px 0 8px}
 .cards div{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 12px}
 .cards span{display:block;font-size:12px;color:var(--mut)}.cards b{font-size:17px}
 .cards .big{grid-column:1/-1;border-color:var(--ac)}.cards .big b{font-size:28px;color:var(--ac)}
+.prog{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin:10px 0 0}
+.prog i{display:block;height:100%;background:var(--ac)}
 .note{margin:12px 0;padding:10px 12px;border-radius:12px;background:var(--card);border:1px solid var(--bd)}
 .late{color:var(--bad);font-weight:600}.ok{color:var(--ac);font-weight:600}
 .bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
-button{font:inherit;padding:9px 14px;border-radius:10px;border:0;background:var(--ac);color:#fff;cursor:pointer}
-button.ghost{background:transparent;color:var(--fg);border:1px solid var(--bd)}
+button,.btn{font:inherit;padding:9px 14px;border-radius:10px;border:0;background:var(--ac);color:#fff;cursor:pointer;text-decoration:none;display:inline-block}
+button.ghost,.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--bd)}
 button.x{padding:2px 8px;background:transparent;color:var(--mut)}
+button:disabled{opacity:.6}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .form{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:12px 0;display:grid;gap:8px}
 label{display:grid;gap:3px;font-size:13px;color:var(--mut)}
 input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);min-width:0;width:100%}
 .err{color:var(--bad);font-size:14px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}
 .row small,.empty{color:var(--mut)}
-.item{width:100%;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd);display:flex;justify-content:space-between;margin-bottom:8px}
+.item{width:100%;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.item small{display:block}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
-<p class="empty" style="text-align:center;font-size:12px;margin:24px 0">versión 2</p>
-<script>
-// === CONFIGURACIÓN: pega aquí la URL de tu Apps Script (termina en /exec) ===
-const API = "https://script.google.com/macros/s/AKfycbz2gYfC_dS3_sWhFByfDpJDGpWp3r1dx3r0-NUzz78j-wHh1RdCPRlHMAUFsWRSKNe6JA/exec";
-// ===========================================================================
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,doc,onSnapshot,setDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app=initializeApp({
+  apiKey:"AIzaSyDP2T1g5CDbgGoqnt-QAQI7eL2mjjsDl98",
+  authDomain:"cobros-5a9e5.firebaseapp.com",
+  projectId:"cobros-5a9e5",
+  storageBucket:"cobros-5a9e5.firebasestorage.app",
+  messagingSenderId:"838028186853",
+  appId:"1:838028186853:web:97ede76ee44e2d155eb00c"
+});
+const auth=getAuth(app),db=getFirestore(app);
+
 const $=document.getElementById("root"),q=new URLSearchParams(location.search);
 const M=n=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n||0);
-const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const F=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short",year:"numeric"}):"";
-const today=()=>new Date().toISOString().slice(0,10);
-let owner=false,PIN="",L={},cur=null,form=null,err="",askDel=false;
-try{PIN=localStorage.getItem("pin")||""}catch(e){}
+const pad=n=>String(n).padStart(2,"0");
+const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); // fecha local, no UTC
+const today=()=>iso(new Date());
+const norm=d=>Object.assign({name:"",principal:0,rate:0,weeks:0,start:"",pagos:[],gastos:[]},d);
+const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(10)),b=>b.toString(16).padStart(2,"0")).join("");
 const msg=t=>'<p class="empty">'+t+'</p>';
-const get=async p=>(await fetch(API+"?"+p)).json();
-const post=async o=>(await fetch(API,{method:"POST",body:JSON.stringify(Object.assign({pin:PIN},o))})).json();
-const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(36).padStart(2,"0")).join("").slice(0,12);
+let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null;
+
 function calc(l){
   const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.weeks||1,cuota=(p+int)/w;
   const g=l.gastos.reduce((s,x)=>s+x.amt,0),paid=l.pagos.reduce((s,x)=>s+x.amt,0);
   const days=l.start?Math.floor((Date.now()-new Date(l.start+"T00:00"))/864e5):0;
   const el=Math.max(0,Math.min(w,Math.floor(days/7)));
   const late=Math.max(0,el*cuota+g-paid),bal=p+int+g-paid;
-  let next=null;if(l.start&&el<w){const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+7*(el+1));next=d.toISOString().slice(0,10)}
-  return{int,g,paid,cuota,late,bal,next};
+  let next=null;if(l.start&&el<w){const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+7*(el+1));next=iso(d)}
+  return{int,g,paid,cuota,late,bal,next,pct:Math.min(100,Math.round(paid/((p+int+g)||1)*100))};
 }
 const inp=(id,l,t,v,x)=>'<label>'+l+'<input id="'+id+'" type="'+t+'" value="'+esc(v)+'" '+(x||"")+'></label>';
 function formHtml(){
   const l=cur.loan;let h='<div class="form">';
-  if(form==="setup")h+=inp("f_n","Nombre de la persona","text",l.name)+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"","step=\"any\"")+inp("f_w","Número de semanas para pagar","number",l.weeks||"")+inp("f_d","Fecha del préstamo","date",l.start||today());
+  if(form==="setup")h+=inp("f_n","Nombre de la persona","text",l.name)+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de semanas para pagar","number",l.weeks||"")+inp("f_d","Fecha del préstamo","date",l.start||today());
   if(form==="pago")h+=inp("f_d","Fecha del pago","date",today())+inp("f_a","Monto pagado (COP)","number","",'inputmode="numeric"')+inp("f_t","Nota (opcional)","text","");
   if(form==="gasto")h+=inp("f_d","Fecha","date",today())+inp("f_t","Descripción del gasto","text","")+inp("f_a","Monto (COP)","number","",'inputmode="numeric"');
   if(err)h+='<div class="err">'+esc(err)+"</div>";
@@ -65,14 +81,16 @@ function formHtml(){
 }
 function list(t,arr,k,fn){
   let h="<h2>"+t+"</h2>";if(!arr.length)return h+'<div class="empty">Sin registros</div>';
-  arr.forEach((x,i)=>{h+='<div class="row"><div>'+fn(x)+"</div>"+(owner?'<button class="x" data-act="del-'+k+'" data-i="'+i+'">✕</button>':"")+"</div>"});return h;
+  arr.forEach((x,i)=>{h+='<div class="row"><div>'+fn(x)+"</div>"+(owner?'<button class="x" data-act="del-'+k+'" data-i="'+i+'" aria-label="Eliminar">✕</button>':"")+"</div>"});return h;
 }
 function view(){
   if(owner&&!cur){
-    let h="<h1>Mis préstamos</h1><p class=\"sub\">Toca uno para verlo o editarlo.</p>";
-    const ids=Object.keys(L);
+    const ids=Object.keys(L).sort((a,b)=>L[a].name.localeCompare(L[b].name));
+    const tot=ids.reduce((s,id)=>s+Math.max(0,calc(L[id]).bal),0);
+    let h='<div class="bar" style="justify-content:space-between;margin-top:0"><h1>Mis préstamos</h1><button class="ghost" data-act="logout">Salir</button></div>';
+    h+='<p class="sub">'+(ids.length?"Por cobrar en total: <b>"+M(tot)+"</b>. Toca uno para verlo o editarlo.":"")+"</p>";
     if(!ids.length)h+=msg("Aún no tienes préstamos.");
-    ids.forEach(id=>{const l=L[id];h+='<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+"</span><b>"+M(calc(l).bal)+"</b></button>"});
+    ids.forEach(id=>{const l=L[id],c=calc(l);h+='<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+(c.bal>0&&c.late>0?'<small class="late">Atrasado: '+M(c.late)+"</small>":c.bal<=0?'<small class="ok">Pagado</small>':"")+"</span><b>"+M(c.bal)+"</b></button>"});
     return $.innerHTML=h+'<div class="bar"><button data-act="new">+ Nuevo préstamo</button></div>'+(err?'<div class="err">'+esc(err)+"</div>":"");
   }
   const l=cur.loan,c=calc(l);let h="";
@@ -80,12 +98,16 @@ function view(){
   h+="<h1>"+esc(l.name||"Nuevo préstamo")+"</h1>";
   if(l.name){
     h+='<p class="sub">Préstamo del '+F(l.start)+"</p>";
-    h+='<section class="cards"><div class="big"><span>Saldo pendiente</span><b>'+M(c.bal)+"</b></div><div><span>Prestado</span><b>"+M(l.principal)+"</b></div><div><span>Interés ("+l.rate+"%)</span><b>"+M(c.int)+"</b></div><div><span>Gastos</span><b>"+M(c.g)+"</b></div><div><span>Pagado</span><b>"+M(c.paid)+"</b></div></section>";
-    h+='<div class="note">Cuota semanal: <b>'+M(c.cuota)+"</b> × "+l.weeks+" semanas. "+(c.bal<=0?'<span class="ok">Pagado completo ✔</span>':c.late>0?'<span class="late">Atrasado: '+M(c.late)+"</span>":'<span class="ok">Al día</span>')+(c.next&&c.bal>0?" Próximo cobro: "+F(c.next)+".":"")+"</div>";
+    h+='<section class="cards"><div class="big"><span>Saldo pendiente</span><b>'+M(c.bal)+'</b><div class="prog"><i style="width:'+c.pct+'%"></i></div></div><div><span>Prestado</span><b>'+M(l.principal)+"</b></div><div><span>Interés ("+esc(l.rate)+"%)</span><b>"+M(c.int)+"</b></div><div><span>Gastos</span><b>"+M(c.g)+"</b></div><div><span>Pagado ("+c.pct+"%)</span><b>"+M(c.paid)+"</b></div></section>";
+    h+='<div class="note">Cuota semanal: <b>'+M(c.cuota)+"</b> × "+esc(l.weeks)+" semanas. "+(c.bal<=0?'<span class="ok">Pagado completo ✔</span>':c.late>0?'<span class="late">Atrasado: '+M(c.late)+"</span>":'<span class="ok">Al día</span>')+(c.next&&c.bal>0?" Próximo cobro: "+F(c.next)+".":"")+"</div>";
   }
   if(owner){
     h+=form?formHtml():'<div class="bar"><button data-act="pago">+ Pago</button><button data-act="gasto">+ Gasto</button><button class="ghost" data-act="setup">Editar préstamo</button></div>';
-    if(l.name)h+='<label>Link para tu cliente (cópialo y envíalo)<input readonly value="'+location.origin+location.pathname+"?c="+cur.id+'" onclick="this.select()"></label>';
+    if(l.name){
+      const link=location.origin+location.pathname+"?c="+cur.id;
+      h+='<label>Link para tu cliente<input readonly value="'+link+'" onclick="this.select()"></label>';
+      h+='<div class="bar"><button class="ghost" data-act="copy">Copiar link</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent("Aquí puedes ver el estado de tu préstamo: "+link)+'">Enviar por WhatsApp</a></div>';
+    }
     if(err&&!form)h+='<div class="err">'+esc(err)+"</div>";
   }
   if(l.name){
@@ -95,29 +117,28 @@ function view(){
   if(owner&&l.name)h+='<div class="bar"><button class="ghost" data-act="'+(askDel?"del-loan":"ask-del")+'">'+(askDel?"Toca otra vez para eliminar":"Eliminar préstamo")+"</button></div>";
   $.innerHTML=h;
 }
-function askPin(m){$.innerHTML='<h1>Entrar</h1><div class="form">'+inp("f_pin","Tu PIN","password","")+(m?'<div class="err">'+m+"</div>":"")+'<button data-act="login">Entrar</button></div>'}
-async function load(){
-  try{const r=await get("pin="+encodeURIComponent(PIN));
-    if(r.error){PIN="";try{localStorage.removeItem("pin")}catch(e){}return askPin("PIN incorrecto")}
-    L=r.loans;view();
-  }catch(e){$.innerHTML=msg("No se pudo conectar con el servidor.")+"<p class=\"empty\"><small>Detalle técnico: "+esc(e&&e.message)+"</small></p>"}
-}
-async function save(){
-  err="";try{const r=await post({action:"save",id:cur.id,loan:cur.loan});if(r.error)throw 0;L[cur.id]=cur.loan}catch(e){err="No se pudo guardar. Revisa tu conexión e intenta de nuevo."}
-  form=null;view();
+function askLogin(m){$.innerHTML='<h1>Entrar</h1><div class="form">'+inp("f_e","Correo","email","",'autocomplete="username"')+inp("f_pw","Contraseña","password","",'autocomplete="current-password"')+(m?'<div class="err">'+m+"</div>":"")+'<button data-act="login">Entrar</button></div>'}
+
+async function save(loan){
+  err="";
+  try{await setDoc(doc(db,"prestamos",cur.id),loan);cur.loan=loan;L[cur.id]=loan;form=null}
+  catch(e){err="No se pudo guardar ("+(e.code||"error")+"). Revisa tu conexión e intenta de nuevo."}
+  view();
 }
 $.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act,v=id=>document.getElementById(id).value;
-  if(a==="login"){PIN=v("f_pin");try{localStorage.setItem("pin",PIN)}catch(x){}return load()}
+  if(a==="login"){b.disabled=true;try{await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"))}catch(x){askLogin("Correo o contraseña incorrectos.")}return}
   if(!owner)return;err="";
+  if(a==="logout")return signOut(auth);
   if(a==="open"){cur={id:b.dataset.id,loan:L[b.dataset.id]};form=null;askDel=false;return view()}
   if(a==="back"){cur=null;form=null;return view()}
-  if(a==="new"){cur={id:newId(),loan:{name:"",principal:0,rate:0,weeks:0,start:"",pagos:[],gastos:[]}};form="setup";return view()}
-  if(a==="cancel"){form=cur.loan.name?null:"setup";if(!cur.loan.name){cur=null;form=null}return view()}
+  if(a==="new"){cur={id:newId(),loan:norm()};form="setup";return view()}
+  if(a==="cancel"){form=null;if(!cur.loan.name)cur=null;return view()}
+  if(a==="copy"){try{await navigator.clipboard.writeText(location.origin+location.pathname+"?c="+cur.id);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(["pago","gasto","setup"].includes(a)){form=a;return view()}
   if(a==="ask-del"){askDel=true;return view()}
-  if(a==="del-loan"){try{await post({action:"delete",id:cur.id});delete L[cur.id]}catch(x){}cur=null;askDel=false;return view()}
-  const l=cur.loan;
+  if(a==="del-loan"){try{await deleteDoc(doc(db,"prestamos",cur.id));delete L[cur.id];cur=null}catch(x){err="No se pudo eliminar ("+(x.code||"error")+")."}askDel=false;return view()}
+  const l=structuredClone(cur.loan);
   if(a==="save-setup"){
     const n=v("f_n").trim(),p=+v("f_p"),r=+v("f_r"),w=+v("f_w"),d=v("f_d");
     if(!n||!(p>0)||!(w>0)||!d||r<0){err="Completa nombre, monto, semanas y fecha.";return view()}
@@ -127,15 +148,32 @@ $.addEventListener("click",async e=>{
     if(a==="save-pago")l.pagos.push({d:v("f_d"),amt,n:v("f_t").trim()});
     else{if(!v("f_t").trim()){err="Escribe una descripción.";return view()}l.gastos.push({d:v("f_d"),amt,desc:v("f_t").trim()})}
     l.pagos.sort((x,y)=>x.d<y.d?-1:1);l.gastos.sort((x,y)=>x.d<y.d?-1:1);
-  }else if(a==="del-pago")l.pagos.splice(+b.dataset.i,1);
-  else if(a==="del-gasto")l.gastos.splice(+b.dataset.i,1);
-  else return;
-  await save();
+  }else if(a==="del-pago"||a==="del-gasto"){
+    if(!confirm("¿Eliminar este registro?"))return;
+    l[a==="del-pago"?"pagos":"gastos"].splice(+b.dataset.i,1);
+  }else return;
+  b.disabled=true;await save(l);
 });
-(async()=>{
-  if(!API){$.innerHTML=msg("Falta pegar la URL del servidor (API) en index.html.");return}
-  const c=q.get("c");
-  if(c){try{const r=await get("c="+encodeURIComponent(c));if(r.loan){cur={id:c,loan:r.loan};view()}else $.innerHTML=msg("No encontramos este préstamo. Revisa el enlace.")}catch(e){$.innerHTML=msg("No se pudo cargar. Intenta de nuevo.")+"<p class=\"empty\"><small>Detalle técnico: "+esc(e&&e.message)+"</small></p>"}return}
-  owner=true;PIN?load():askPin();
-})();
+$.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="f_pw")document.querySelector('[data-act="login"]').click()});
+
+// ---- Arranque ----
+const c=q.get("c");
+if(c){ // vista del cliente: solo lectura, sin sesión
+  onSnapshot(doc(db,"prestamos",c),
+    s=>{if(s.exists()){cur={id:c,loan:norm(s.data())};view()}else $.innerHTML=msg("No encontramos este préstamo. Revisa el enlace.")},
+    ()=>$.innerHTML=msg("No se pudo cargar. Intenta de nuevo."));
+}else{
+  onAuthStateChanged(auth,u=>{
+    if(unsub){unsub();unsub=null}
+    if(!u){owner=false;L={};cur=null;form=null;return askLogin()}
+    owner=true;
+    unsub=onSnapshot(collection(db,"prestamos"),
+      s=>{
+        L={};s.forEach(d=>L[d.id]=norm(d.data()));
+        if(cur&&cur.loan.name){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
+        if(!form)view();
+      },
+      e=>$.innerHTML=msg("No se pudo leer los datos ("+esc(e.code)+"). Revisa las reglas de Firestore."));
+  });
+}
 </script></body></html>
