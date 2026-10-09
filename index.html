@@ -88,7 +88,7 @@ const shrink=async f=>{
   return out};
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(10)),b=>b.toString(16).padStart(2,"0")).join("");
 const msg=t=>'<p class="empty">'+t+'</p>';
-let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"30"};
+let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,showWk=false,mesOff=0,simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"30"};
 
 function calc(l){
   const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.cuotas||1,per=+l.dias||30,cuota=(p+int)/w;
@@ -121,6 +121,40 @@ function newSimHtml(p,r,q,d,start){
   let fin="";if(start&&n&&d>0){const x=new Date(start+"T00:00");x.setDate(x.getDate()+d*n);fin=iso(x)}
   return '<h2>Ganancia de este préstamo</h2><section class="cards"><div><span>Cuota</span><b>'+M(cuota)+'</b></div><div><span>Recibes en total</span><b>'+M(p+gan)+'</b></div><div><span>Ganancia total</span><b>'+M(gan)+'</b></div><div><span>Ganancia por mes</span><b>'+M(gm)+'</b></div></section>'
    +(fin?'<p class="sub">Última cuota: '+F(fin)+" · plazo de "+meses.toFixed(1)+" meses</p>":"");
+}
+function mesDetalle(off){
+  const t=new Date();t.setDate(1);t.setMonth(t.getMonth()+off);
+  const Y=t.getFullYear(),Mo=t.getMonth(),ym=Y+"-"+pad(Mo+1),dim=new Date(Y,Mo+1,0).getDate(),fo=(new Date(Y,Mo,1).getDay()+6)%7;
+  const W={},wk=day=>Math.floor((day-1+fo)/7),get=w=>W[w]||(W[w]={items:[],esp:0,cob:0});
+  let cob=0,ganCob=0,esp=0,ganEsp=0;
+  for(const id of Object.keys(L)){
+    const l=L[id],c=calc(l),tot=(+l.principal||0)+c.int,r=tot>0?c.int/tot:0;
+    for(const x of l.pagos)if((x.d||"").startsWith(ym)){const w=get(wk(+x.d.slice(8,10)));w.cob+=x.amt;cob+=x.amt;ganCob+=x.amt*r}
+    for(let k=1;k<=(+l.cuotas||0);k++){
+      const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+(+l.dias||30)*k);
+      if(iso(d).startsWith(ym)){
+        const cov=c.paid>=k*c.cuota-.5,w=get(wk(d.getDate()));
+        w.items.push({name:l.name,amt:c.cuota,day:d.getDate(),cov,late:!cov&&iso(d)<today()});
+        w.esp+=c.cuota;esp+=c.cuota;ganEsp+=c.cuota*r;
+      }
+    }
+  }
+  const largo=t.toLocaleDateString("es-CO",{month:"long"}),corto=largo.slice(0,3);
+  const weeks=Object.keys(W).map(Number).sort((a,b)=>a-b).map(w=>{
+    const a=Math.max(1,1+w*7-fo),b=Math.min(dim,(w+1)*7-fo),x=W[w];
+    x.items.sort((p,q)=>p.day-q.day);
+    return Object.assign({label:"Semana "+(w+1)+" · "+a+(b>a?"–"+b:"")+" "+corto},x);
+  });
+  return{nombre:largo+" "+Y,weeks,cob,ganCob,esp,ganEsp};
+}
+function mesHtml(){
+  const m=mesDetalle(mesOff);
+  const nav='<div class="bar" style="justify-content:space-between;align-items:center"><button class="ghost" data-act="mes" data-d="-1" aria-label="Mes anterior">◀</button><b style="text-transform:capitalize">'+esc(m.nombre)+'</b><button class="ghost" data-act="mes" data-d="1" aria-label="Mes siguiente">▶</button></div>';
+  const st=i=>i.cov?'<span class="ok">Pagada</span>':i.late?'<span class="late">Atrasada</span>':"Pendiente";
+  return '<section class="cards plan"><details class="big" id="wk"'+(showWk?" open":"")+'><summary><b style="font-size:16px">Pagos por semana</b><span class="more">Cuotas y cobros de '+esc(m.nombre)+'</span></summary><div class="sch">'+nav
+   +'<p class="sub">Por cobrar del mes: '+M(m.esp)+' (ganancia '+M(m.ganEsp)+') · Cobrado: '+M(m.cob)+' (ganancia '+M(m.ganCob)+')</p>'
+   +(m.weeks.length?m.weeks.map(w=>'<h2>'+w.label+'</h2><p class="sub">Por cobrar '+M(w.esp)+' · Cobrado '+M(w.cob)+'</p>'+w.items.map(i=>'<div class="sr"><span>'+i.day+" · "+esc(i.name)+"</span><span>"+M(i.amt)+" · "+st(i)+"</span></div>").join("")).join(""):'<div class="empty">No hay cuotas ni pagos en este mes.</div>')
+   +"</div></details></section>";
 }
 function simCalc(v){
   const m=+v.monto||0,r=+v.rate||0,q=+v.cuotas||0,d=+v.dias||0,cap=+v.cap||0;
@@ -155,9 +189,10 @@ function view(){
     else{
       const prest=ids.reduce((x,id)=>x+(+L[id].principal||0),0);
       const act=ids.filter(id=>calc(L[id]).bal>0);
-      const gm=act.reduce((x,id)=>{const l=L[id],mes=(+l.cuotas||1)*(+l.dias||30)/30;return x+calc(l).int/mes},0);
-      h+='<section class="cards"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia mensual</span><b>'+M(gm)+'</b><span>'+act.length+(act.length==1?" préstamo activo":" préstamos activos")+'</span></div></section>';
+      const gi=ids.reduce((x,id)=>x+calc(L[id]).int,0);
+      h+='<section class="cards"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b><span>suma de '+ids.length+(ids.length==1?" préstamo":" préstamos")+'</span></div></section>';
     }
+    if(ids.length)h+=mesHtml();
     h+=simBox();
     ids.forEach(id=>{const l=L[id],c=calc(l);h+='<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+(c.bal>0&&c.late>0?'<small class="late">Atrasado: '+M(c.late)+"</small>":c.bal<=0?'<small class="ok">Pagado</small>':"")+"</span><b>"+M(c.bal)+"</b></button>"});
     return $.innerHTML=h+'<div class="bar"><button data-act="new">+ Nuevo préstamo</button></div>'+(err?'<div class="err">'+esc(err)+"</div>":"");
@@ -207,6 +242,7 @@ $.addEventListener("click",async e=>{
   if(a==="unzoom"){zoom=-1;return view()}
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
+  if(a==="mes"){mesOff+=+b.dataset.d;return view()}
   if(a==="rm-foto"){fotosTmp.splice(+b.dataset.i,1);return prev()}
   if(a==="open"){cur={id:b.dataset.id,loan:L[b.dataset.id]};form=null;askDel=false;zoom=-1;return view()}
   if(a==="back"){cur=null;form=null;return view()}
@@ -249,7 +285,7 @@ $.addEventListener("input",e=>{
   const k={s_cap:"cap",s_monto:"monto",s_n:"n",s_rate:"rate",s_cuotas:"cuotas",s_dias:"dias"}[e.target.id];
   if(!k)return;simv[k]=e.target.value;const o=document.getElementById("sim_out");if(o)o.innerHTML=simHtml();
 });
-$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open},true);
+$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open;if(e.target.id==="wk")showWk=e.target.open},true);
 $.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="f_pw")document.querySelector('[data-act="login"]').click()});
 
 // ---- Arranque ----
