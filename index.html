@@ -2,6 +2,9 @@
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cobro de préstamo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--bg:#faf8f4;--fg:#1f2a24;--mut:#6b7570;--card:#fff;--bd:#e4e0d6;--ac:#1d7a55;--bad:#b3261e}
 @media (prefers-color-scheme:dark){:root{--bg:#15191a;--fg:#e8ece9;--mut:#9aa5a0;--card:#1e2426;--bd:#2d3638;--ac:#4fbf8f;--bad:#ff8a80}}
@@ -59,6 +62,7 @@ const app=initializeApp({
   appId:"1:838028186853:web:97ede76ee44e2d155eb00c"
 });
 const auth=getAuth(app),db=getFirestore(app);
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 
 const $=document.getElementById("root"),q=new URLSearchParams(location.search);
 const M=n=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n||0);
@@ -70,10 +74,21 @@ const today=()=>iso(new Date());
 const norm=d=>{const l=Object.assign({name:"",cedula:"",fotos:[],principal:0,rate:0,start:"",pagos:[],gastos:[]},d);
   if(!l.cuotas){l.cuotas=+l.weeks||0;l.dias=l.weeks?7:30} // préstamos viejos en semanas siguen funcionando
   l.dias=+l.dias||30;return l};
-const shrink=f=>new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const s=Math.min(1,900/Math.max(im.width,im.height)),cv=document.createElement("canvas");cv.width=Math.round(im.width*s);cv.height=Math.round(im.height*s);cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);ok(cv.toDataURL("image/jpeg",.7))};im.onerror=()=>{URL.revokeObjectURL(u);no()};im.src=u});
+const shrink=async f=>{
+  let bm=null,src;
+  // las fotos de cámara son enormes: se reducen al decodificar para no quedarse sin memoria
+  for(const o of [{resizeWidth:1000,resizeQuality:"medium"},{}]){try{bm=await createImageBitmap(f,o);break}catch(x){}}
+  if(bm)src=bm;else src=await new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{URL.revokeObjectURL(u);ok(im)};im.onerror=()=>{URL.revokeObjectURL(u);no(new Error("img"))};im.src=u});
+  const w=bm?bm.width:src.naturalWidth,h=bm?bm.height:src.naturalHeight,k=Math.min(1,800/Math.max(w,h)),cv=document.createElement("canvas");
+  cv.width=Math.max(1,Math.round(w*k));cv.height=Math.max(1,Math.round(h*k));
+  cv.getContext("2d").drawImage(src,0,0,cv.width,cv.height);
+  if(bm&&bm.close)bm.close();
+  const out=cv.toDataURL("image/jpeg",.65);
+  if(!out.startsWith("data:image/jpeg")||out.length<500)throw new Error("canvas");
+  return out};
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(10)),b=>b.toString(16).padStart(2,"0")).join("");
 const msg=t=>'<p class="empty">'+t+'</p>';
-let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false;
+let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"30"};
 
 function calc(l){
   const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.cuotas||1,per=+l.dias||30,cuota=(p+int)/w;
@@ -90,7 +105,7 @@ function prevHtml(){return fotosTmp.map((f,i)=>'<div class="th"><img src="'+f+'"
 function prev(){const p=document.getElementById("f_prev");if(p)p.innerHTML=prevHtml()}
 function formHtml(){
   const l=cur.loan;let h='<div class="form">';
-  if(form==="setup")h+=inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Días entre cuotas (30 = cada mes)","number",l.dias||30)+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+"</div>";
+  if(form==="setup")h+=inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Días entre cuotas (30 = cada mes)","number",l.dias||30)+'<div id="f_sim">'+newSimHtml(+l.principal||0,+l.rate||0,+l.cuotas||0,+l.dias||30,l.start||today())+"</div>"+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+'</div><small id="f_msg" class="late"></small>';
   if(form==="pago")h+=inp("f_d","Fecha del pago","date",today())+inp("f_a","Monto pagado (COP)","number","",'inputmode="numeric"')+inp("f_t","Nota (opcional)","text","");
   if(form==="gasto")h+=inp("f_d","Fecha","date",today())+inp("f_t","Descripción del gasto","text","")+inp("f_a","Monto (COP)","number","",'inputmode="numeric"');
   if(err)h+='<div class="err">'+esc(err)+"</div>";
@@ -100,6 +115,36 @@ function list(t,arr,k,fn){
   let h="<h2>"+t+"</h2>";if(!arr.length)return h+'<div class="empty">Sin registros</div>';
   arr.forEach((x,i)=>{h+='<div class="row"><div>'+fn(x)+"</div>"+(owner?'<button class="x" data-act="del-'+k+'" data-i="'+i+'" aria-label="Eliminar">✕</button>':"")+"</div>"});return h;
 }
+function newSimHtml(p,r,q,d,start){
+  if(!(p>0))return '<div class="empty">Escribe el monto para ver cuánto ganarías con este préstamo.</div>';
+  const gan=p*r/100,n=q>0?q:0,cuota=n?(p+gan)/n:0,meses=n*d/30,gm=meses>0?gan/meses:0;
+  let fin="";if(start&&n&&d>0){const x=new Date(start+"T00:00");x.setDate(x.getDate()+d*n);fin=iso(x)}
+  return '<h2>Ganancia de este préstamo</h2><section class="cards"><div><span>Cuota</span><b>'+M(cuota)+'</b></div><div><span>Recibes en total</span><b>'+M(p+gan)+'</b></div><div><span>Ganancia total</span><b>'+M(gan)+'</b></div><div><span>Ganancia por mes</span><b>'+M(gm)+'</b></div></section>'
+   +(fin?'<p class="sub">Última cuota: '+F(fin)+" · plazo de "+meses.toFixed(1)+" meses</p>":"");
+}
+function simCalc(v){
+  const m=+v.monto||0,r=+v.rate||0,q=+v.cuotas||0,d=+v.dias||0,cap=+v.cap||0;
+  let n=Math.floor(+v.n)||0;if(!n)n=m>0?(cap>0?Math.floor(cap/m):1):0;
+  const gan=m*r/100,cuota=q>0?(m+gan)/q:0,meses=q*d/30,gm=meses>0?gan/meses:0;
+  return{n,m,gan,cuota,meses,gm,tot:n*m,ganT:n*gan,ganM:n*gm,recibir:n*(m+gan),over:cap>0?Math.max(0,n*m-cap):0};
+}
+function simHtml(){
+  const s=simCalc(simv);
+  if(!(s.m>0))return '<div class="empty">Escribe el monto por persona para ver el cálculo.</div>';
+  return '<h2>Por persona</h2><section class="cards"><div><span>Cuota (cada '+(+simv.dias||0)+' días)</span><b>'+M(s.cuota)+'</b></div><div><span>Ganancia total</span><b>'+M(s.gan)+'</b></div><div class="big"><span>Ganancia por mes</span><b>'+M(s.gm)+'</b></div></section><p class="sub">Plazo: '+s.meses.toFixed(1)+' meses</p>'
+   +'<h2>En total · '+s.n+(s.n==1?" persona":" personas")+'</h2><section class="cards"><div><span>Prestas</span><b>'+M(s.tot)+'</b></div><div><span>Recibes</span><b>'+M(s.recibir)+'</b></div><div><span>Ganancia total</span><b>'+M(s.ganT)+'</b></div><div><span>Ganancia por mes</span><b>'+M(s.ganM)+'</b></div></section>'
+   +(s.over>0?'<div class="err">Te pasas de tu capital por '+M(s.over)+".</div>":"");
+}
+function simBox(){
+  return '<section class="cards plan"><details class="big" id="sim"'+(showSim?" open":"")+'><summary><b style="font-size:16px">Simulador de varias personas</b><span class="more">Ej.: 10 personas de $80.000 a 4 cuotas</span></summary><div class="sch">'
+   +inp("s_cap","Capital disponible (opcional)","number",simv.cap,'inputmode="decimal" step="any"')
+   +inp("s_monto","Monto por persona","number",simv.monto,'inputmode="decimal" step="any"')
+   +inp("s_n","Número de personas (vacío = las que alcance el capital)","number",simv.n,'inputmode="numeric"')
+   +inp("s_rate","Interés total del préstamo (%)","number",simv.rate,'inputmode="decimal" step="any"')
+   +inp("s_cuotas","Número de cuotas","number",simv.cuotas,'inputmode="numeric"')
+   +inp("s_dias","Días entre cuotas","number",simv.dias,'inputmode="numeric"')
+   +'<div id="sim_out">'+simHtml()+"</div></div></details></section>";
+}
 function view(){
   if(owner&&!cur){
     const ids=Object.keys(L).sort((a,b)=>L[a].name.localeCompare(L[b].name));
@@ -107,6 +152,13 @@ function view(){
     let h='<div class="bar" style="justify-content:space-between;margin-top:0"><h1>Mis préstamos</h1><button class="ghost" data-act="logout">Salir</button></div>';
     h+='<p class="sub">'+(ids.length?"Por cobrar en total: <b>"+M(tot)+"</b>. Toca uno para verlo o editarlo.":"")+"</p>";
     if(!ids.length)h+=msg("Aún no tienes préstamos.");
+    else{
+      const prest=ids.reduce((x,id)=>x+(+L[id].principal||0),0);
+      const act=ids.filter(id=>calc(L[id]).bal>0);
+      const gm=act.reduce((x,id)=>{const l=L[id],mes=(+l.cuotas||1)*(+l.dias||30)/30;return x+calc(l).int/mes},0);
+      h+='<section class="cards"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia mensual</span><b>'+M(gm)+'</b><span>'+act.length+(act.length==1?" préstamo activo":" préstamos activos")+'</span></div></section>';
+    }
+    h+=simBox();
     ids.forEach(id=>{const l=L[id],c=calc(l);h+='<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+(c.bal>0&&c.late>0?'<small class="late">Atrasado: '+M(c.late)+"</small>":c.bal<=0?'<small class="ok">Pagado</small>':"")+"</span><b>"+M(c.bal)+"</b></button>"});
     return $.innerHTML=h+'<div class="bar"><button data-act="new">+ Nuevo préstamo</button></div>'+(err?'<div class="err">'+esc(err)+"</div>":"");
   }
@@ -181,8 +233,23 @@ $.addEventListener("click",async e=>{
   }else return;
   b.disabled=true;await save(l);
 });
-$.addEventListener("change",async e=>{if(e.target.id!=="f_f")return;for(const f of e.target.files){if(fotosTmp.length>=4)break;try{fotosTmp.push(await shrink(f))}catch(x){}}e.target.value="";prev()});
-$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open},true);
+$.addEventListener("change",async e=>{
+  if(e.target.id!=="f_f")return;
+  const fs=Array.from(e.target.files);e.target.value="";let bad=0,full=false;
+  for(const f of fs){if(fotosTmp.length>=4){full=true;break}try{fotosTmp.push(await shrink(f))}catch(x){bad++}}
+  prev();const m=document.getElementById("f_msg");
+  if(m)m.textContent=full?"Máximo 4 fotos. Quita una (✕) para agregar otra.":bad?"No se pudo leer "+bad+" foto(s). Si la tomaste con la cámara, elígela desde la galería o toma la foto en formato JPG.":"";
+});
+$.addEventListener("input",e=>{
+  if(["f_p","f_r","f_w","f_k","f_d"].includes(e.target.id)){
+    const o=document.getElementById("f_sim"),g=id=>+(document.getElementById(id)||{}).value||0;
+    if(o)o.innerHTML=newSimHtml(g("f_p"),g("f_r"),g("f_w"),g("f_k")||30,(document.getElementById("f_d")||{}).value||today());
+    return;
+  }
+  const k={s_cap:"cap",s_monto:"monto",s_n:"n",s_rate:"rate",s_cuotas:"cuotas",s_dias:"dias"}[e.target.id];
+  if(!k)return;simv[k]=e.target.value;const o=document.getElementById("sim_out");if(o)o.innerHTML=simHtml();
+});
+$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open},true);
 $.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="f_pw")document.querySelector('[data-act="login"]').click()});
 
 // ---- Arranque ----
