@@ -26,6 +26,7 @@ summary b{font-size:20px}.more{color:var(--ac)!important;margin-top:4px}.more::a
 .thumbs{display:flex;gap:8px;flex-wrap:wrap}.th{position:relative}
 .thumbs img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--bd);cursor:pointer;display:block}
 .th button.x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border-radius:99px}
+.al{display:flex;align-items:center;gap:8px;margin-top:8px}.al>button{flex:1;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd)}.al .btn{white-space:nowrap}
 .zoom{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
 .zoom img{max-width:100%;max-height:100%;border-radius:8px}.cards .big b{font-size:28px;color:var(--ac)}
 .prog{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin:10px 0 0}
@@ -50,8 +51,8 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,doc,onSnapshot,setDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,doc,onSnapshot,setDoc,deleteDoc,query,where,getDoc,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app=initializeApp({
   apiKey:"AIzaSyDP2T1g5CDbgGoqnt-QAQI7eL2mjjsDl98",
@@ -71,7 +72,8 @@ const F=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",mont
 const pad=n=>String(n).padStart(2,"0");
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); // fecha local, no UTC
 const today=()=>iso(new Date());
-const norm=d=>{const l=Object.assign({name:"",cedula:"",fotos:[],principal:0,rate:0,start:"",pagos:[],gastos:[]},d);
+const ADMIN="pbcPzLpAIyc2vUcsllsANp0PCSW2";
+const norm=d=>{const l=Object.assign({name:"",cedula:"",tel:"",fotos:[],principal:0,rate:0,start:"",pagos:[],gastos:[]},d);
   if(!l.cuotas){l.cuotas=+l.weeks||0;l.dias=l.weeks?7:30} // préstamos viejos en semanas siguen funcionando
   l.dias=+l.dias||30;return l};
 const shrink=async f=>{
@@ -88,7 +90,7 @@ const shrink=async f=>{
   return out};
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(10)),b=>b.toString(16).padStart(2,"0")).join("");
 const msg=t=>'<p class="empty">'+t+'</p>';
-let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,showWk=false,mesOff=0,simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"30"};
+let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,showWk=false,mesOff=0,renewBal=0,deferredInstall=null,invLink="",rcode=q.get("r"),simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"30"};
 
 function calc(l){
   const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.cuotas||1,per=+l.dias||30,cuota=(p+int)/w;
@@ -105,7 +107,7 @@ function prevHtml(){return fotosTmp.map((f,i)=>'<div class="th"><img src="'+f+'"
 function prev(){const p=document.getElementById("f_prev");if(p)p.innerHTML=prevHtml()}
 function formHtml(){
   const l=cur.loan;let h='<div class="form">';
-  if(form==="setup")h+=inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Días entre cuotas (30 = cada mes)","number",l.dias||30)+'<div id="f_sim">'+newSimHtml(+l.principal||0,+l.rate||0,+l.cuotas||0,+l.dias||30,l.start||today())+"</div>"+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+'</div><small id="f_msg" class="late"></small>';
+  if(form==="setup")h+=(renewBal>0?'<div class="note">Ojo: esta persona aún debe '+M(renewBal)+' del préstamo anterior. El préstamo nuevo se maneja por separado.</div>':"")+inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+inp("f_tel","Celular / WhatsApp (opcional)","tel",l.tel||"",'inputmode="tel"')+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Días entre cuotas (30 = cada mes)","number",l.dias||30)+'<div id="f_sim">'+newSimHtml(+l.principal||0,+l.rate||0,+l.cuotas||0,+l.dias||30,l.start||today())+"</div>"+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+'</div><small id="f_msg" class="late"></small>';
   if(form==="pago")h+=inp("f_d","Fecha del pago","date",today())+inp("f_a","Monto pagado (COP)","number","",'inputmode="numeric"')+inp("f_t","Nota (opcional)","text","");
   if(form==="gasto")h+=inp("f_d","Fecha","date",today())+inp("f_t","Descripción del gasto","text","")+inp("f_a","Monto (COP)","number","",'inputmode="numeric"');
   if(err)h+='<div class="err">'+esc(err)+"</div>";
@@ -121,6 +123,22 @@ function newSimHtml(p,r,q,d,start){
   let fin="";if(start&&n&&d>0){const x=new Date(start+"T00:00");x.setDate(x.getDate()+d*n);fin=iso(x)}
   return '<h2>Ganancia de este préstamo</h2><section class="cards"><div><span>Cuota</span><b>'+M(cuota)+'</b></div><div><span>Recibes en total</span><b>'+M(p+gan)+'</b></div><div><span>Ganancia total</span><b>'+M(gan)+'</b></div><div><span>Ganancia por mes</span><b>'+M(gm)+'</b></div></section>'
    +(fin?'<p class="sub">Última cuota: '+F(fin)+" · plazo de "+meses.toFixed(1)+" meses</p>":"");
+}
+function waLink(l,txt){let t=String(l.tel||"").replace(/\D/g,"");if(t.length===10)t="57"+t;return"https://wa.me/"+t+"?text="+encodeURIComponent(txt)}
+function clientLink(id){return location.origin+location.pathname+"?c="+id}
+function dueInfo(l,c){
+  const S=sched(l,c),lates=S.filter(x=>x.late),td=S.find(x=>x.d===today()&&!x.cov);
+  const la=lates.length?Math.max(0,lates.length*c.cuota+c.g-c.paid):0,ho=td?Math.max(0,Math.min(c.cuota,td.k*c.cuota-c.paid)):0;
+  return{late:la>0?{amt:la,dias:Math.floor((Date.now()-new Date(lates[0].d+"T00:00"))/864e5)}:null,hoy:!la&&ho>0?{amt:ho}:null};
+}
+function alertHtml(ids){
+  const hoy=[],atr=[];
+  ids.forEach(id=>{const l=L[id],c=calc(l);if(c.bal<=0)return;const d=dueInfo(l,c);if(d.late)atr.push({id,l,x:d.late});else if(d.hoy)hoy.push({id,l,x:d.hoy})});
+  const row=(i,sub,txt)=>'<div class="al"><button data-act="open" data-id="'+i.id+'">'+esc(i.l.name)+sub+'<br><b>'+M(i.x.amt)+'</b></button><a class="btn" target="_blank" rel="noopener" href="'+waLink(i.l,txt)+'">Recordar</a></div>';
+  let h="";
+  if(atr.length)h+='<h2>Atrasados ('+atr.length+')</h2>'+atr.map(i=>row(i,'<small class="late">'+i.x.dias+(i.x.dias==1?" día":" días")+" de atraso</small>","Hola "+i.l.name+", tienes un pago atrasado de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
+  if(hoy.length)h+='<h2>Hoy te toca cobrar ('+hoy.length+')</h2>'+hoy.map(i=>row(i,"","Hola "+i.l.name+", te recuerdo que hoy te toca pagar tu cuota de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
+  return h||'<div class="note ok">Hoy no tienes cobros ni atrasos ✔</div>';
 }
 function mesDetalle(off){
   const t=new Date();t.setDate(1);t.setMonth(t.getMonth()+off);
@@ -192,16 +210,18 @@ function view(){
       const gi=ids.reduce((x,id)=>x+calc(L[id]).int,0);
       h+='<section class="cards"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b><span>suma de '+ids.length+(ids.length==1?" préstamo":" préstamos")+'</span></div></section>';
     }
-    if(ids.length)h+=mesHtml();
+    if(ids.length)h+=alertHtml(ids)+mesHtml();
     h+=simBox();
     ids.forEach(id=>{const l=L[id],c=calc(l);h+='<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+(c.bal>0&&c.late>0?'<small class="late">Atrasado: '+M(c.late)+"</small>":c.bal<=0?'<small class="ok">Pagado</small>':"")+"</span><b>"+M(c.bal)+"</b></button>"});
-    return $.innerHTML=h+'<div class="bar"><button data-act="new">+ Nuevo préstamo</button></div>'+(err?'<div class="err">'+esc(err)+"</div>":"");
+    return $.innerHTML=h+'<div class="bar"><button data-act="new">+ Nuevo préstamo</button></div>'+invBox()+(err?'<div class="err">'+esc(err)+"</div>":"");
   }
   const l=cur.loan,c=calc(l);let h="";
   if(owner)h+='<div class="bar"><button class="ghost" data-act="back">← Todos</button></div>';
   h+="<h1>"+esc(l.name||"Nuevo préstamo")+"</h1>";
   if(l.name){
     h+='<p class="sub">Préstamo del '+F(l.start)+(l.cedula?" · Cédula "+(owner?esc(l.cedula):"••••"+esc(String(l.cedula).slice(-3))):"")+"</p>";
+    if(!owner&&c.bal>0){const d=dueInfo(l,c);if(d.late)h+='<div class="note late">⚠ Tienes un pago atrasado de '+M(d.late.amt)+" ("+d.late.dias+(d.late.dias==1?" día":" días")+").</div>";else if(d.hoy)h+='<div class="note">📅 Hoy te toca pagar tu cuota de <b>'+M(d.hoy.amt)+"</b>.</div>"}
+    if(!owner&&deferredInstall)h+='<div class="bar"><button data-act="install">Instalar en mi celular</button></div>';
     h+='<section class="cards"><div class="big"><span>Saldo pendiente</span><b>'+M(c.bal)+'</b><div class="prog"><i style="width:'+c.pct+'%"></i></div></div><div><span>Prestado</span><b>'+M(l.principal)+"</b></div><div><span>Interés ("+esc(l.rate)+"%)</span><b>"+M(c.int)+"</b></div><div><span>Gastos</span><b>"+M(c.g)+"</b></div><div><span>Pagado ("+c.pct+"%)</span><b>"+M(c.paid)+"</b></div></section>";
     const cd=c.bal<=0?'<span class="ok">Pagado completo ✔</span>':c.late>0?'<span class="late">Atrasado: '+M(c.late)+"</span>":'<span class="ok">Al día</span>';
     const S=sched(l,c);
@@ -210,7 +230,7 @@ function view(){
       +S.map(x=>'<div class="sr"><span>Cuota '+x.k+" · "+F(x.d)+"</span><span>"+M(c.cuota)+" · "+(x.cov?'<span class="ok">Pagada</span>':x.late?'<span class="late">Atrasada</span>':"Pendiente")+"</span></div>").join("")+"</div></details></section>";
   }
   if(owner){
-    h+=form?formHtml():'<div class="bar"><button data-act="pago">+ Pago</button><button data-act="gasto">+ Gasto</button><button class="ghost" data-act="setup">Editar préstamo</button></div>';
+    h+=form?formHtml():'<div class="bar"><button data-act="pago">+ Pago</button><button data-act="gasto">+ Gasto</button><button class="ghost" data-act="setup">Editar préstamo</button>'+(l.name?'<button class="ghost" data-act="renew">Renovar / prestar más</button>':"")+"</div>";
     if(l.name){
       const link=location.origin+location.pathname+"?c="+cur.id;
       h+='<label>Link para tu cliente<input readonly value="'+link+'" onclick="this.select()"></label>';
@@ -229,25 +249,60 @@ function view(){
 }
 function askLogin(m){$.innerHTML='<h1>Entrar</h1><div class="form">'+inp("f_e","Correo","email","",'autocomplete="username"')+inp("f_pw","Contraseña","password","",'autocomplete="current-password"')+(m?'<div class="err">'+m+"</div>":"")+'<button data-act="login">Entrar</button></div>'}
 
+function askRegister(m){$.innerHTML='<h1>Crear cuenta</h1><p class="sub">Te invitaron a usar la app de cobros. Crea tu usuario para empezar.</p><div class="form">'+inp("f_e","Correo","email","",'autocomplete="username"')+inp("f_pw","Contraseña (mínimo 6 caracteres)","password","",'autocomplete="new-password"')+inp("f_pw2","Repite la contraseña","password","",'autocomplete="new-password"')+(m?'<div class="err">'+esc(m)+"</div>":"")+'<button data-act="register">Crear mi cuenta</button></div>'}
+async function registerFlow(){
+  try{const s=await getDoc(doc(db,"invitaciones",rcode));
+    if(!s.exists()||s.data().usado){$.innerHTML=msg("Esta invitación no es válida o ya fue usada. Pídele a quien te la envió una nueva.");return}
+  }catch(x){$.innerHTML=msg("No se pudo verificar la invitación. Intenta de nuevo.");return}
+  askRegister();
+}
+function invBox(){
+  if(!(auth.currentUser&&auth.currentUser.uid===ADMIN))return"";
+  let h='<h2>Prestamistas</h2><p class="sub">Invita a alguien para que use la app con su propio usuario.</p><div class="bar"><button class="ghost" data-act="invite">Crear link de invitación</button></div>';
+  if(invLink)h+='<label>Link de invitación (sirve una sola vez)<input readonly value="'+esc(invLink)+'" onclick="this.select()"></label><div class="bar"><button class="ghost" data-act="copy-inv">Copiar link</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent("Te invito a usar la app de cobros. Crea tu cuenta aquí: "+invLink)+'">Enviar por WhatsApp</a></div>';
+  return h;
+}
 async function save(loan){
   err="";
-  try{await setDoc(doc(db,"prestamos",cur.id),loan);cur.loan=loan;L[cur.id]=loan;form=null}
+  try{await setDoc(doc(db,"prestamos",cur.id),loan);cur.loan=loan;delete cur.draft;L[cur.id]=loan;form=null;renewBal=0}
   catch(e){err="No se pudo guardar ("+(e.code||"error")+"). Revisa tu conexión e intenta de nuevo."}
   view();
 }
 $.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act,v=id=>document.getElementById(id).value;
   if(a==="login"){b.disabled=true;try{await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"))}catch(x){askLogin("Correo o contraseña incorrectos.")}return}
+  if(a==="register"){
+    const em=v("f_e").trim(),p1=v("f_pw"),p2=v("f_pw2");
+    if(!em||p1.length<6)return askRegister("Escribe tu correo y una contraseña de al menos 6 caracteres.");
+    if(p1!==p2)return askRegister("Las contraseñas no coinciden.");
+    b.disabled=true;
+    try{
+      let user;
+      try{user=(await createUserWithEmailAndPassword(auth,em,p1)).user}
+      catch(x){if(x.code==="auth/email-already-in-use")user=(await signInWithEmailAndPassword(auth,em,p1)).user;else throw x}
+      const ya=await getDoc(doc(db,"prestamistas",user.uid)).catch(()=>null);
+      if(!(ya&&ya.exists())){const bt=writeBatch(db);bt.set(doc(db,"prestamistas",user.uid),{codigo:rcode,correo:em,creado:Date.now()});bt.update(doc(db,"invitaciones",rcode),{usado:true,uid:user.uid});await bt.commit()}
+      history.replaceState(null,"",location.pathname);rcode=null;startOwner();
+    }catch(x){
+      const c=x.code||"";
+      askRegister(c==="auth/invalid-email"?"El correo no es válido.":c==="auth/weak-password"?"La contraseña es muy débil.":c.startsWith("auth/")?"Ese correo ya tiene cuenta. Revisa la contraseña.":"No se pudo activar tu cuenta ("+(c||"error")+"). Pide un link nuevo.");
+    }
+    return;
+  }
+  if(a==="install"&&deferredInstall){deferredInstall.prompt();deferredInstall=null;return view()}
   if(a==="zoom"){zoom=+b.dataset.i;return view()}
   if(a==="unzoom"){zoom=-1;return view()}
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
+  if(a==="invite"){const code=newId();try{await setDoc(doc(db,"invitaciones",code),{creado:Date.now(),usado:false});invLink=location.origin+location.pathname+"?r="+code}catch(x){err="No se pudo crear la invitación ("+(x.code||"error")+"). ¿Ya actualizaste las reglas de Firestore?"}return view()}
+  if(a==="copy-inv"){try{await navigator.clipboard.writeText(invLink);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(a==="mes"){mesOff+=+b.dataset.d;return view()}
   if(a==="rm-foto"){fotosTmp.splice(+b.dataset.i,1);return prev()}
-  if(a==="open"){cur={id:b.dataset.id,loan:L[b.dataset.id]};form=null;askDel=false;zoom=-1;return view()}
-  if(a==="back"){cur=null;form=null;return view()}
-  if(a==="new"){cur={id:newId(),loan:norm()};form="setup";fotosTmp=[];return view()}
-  if(a==="cancel"){form=null;if(!cur.loan.name)cur=null;return view()}
+  if(a==="open"){cur={id:b.dataset.id,loan:L[b.dataset.id]};renewBal=0;form=null;askDel=false;zoom=-1;return view()}
+  if(a==="back"){cur=null;form=null;renewBal=0;return view()}
+  if(a==="new"){cur={id:newId(),loan:norm(),draft:true};renewBal=0;form="setup";fotosTmp=[];return view()}
+  if(a==="renew"){const o=cur.loan,bal=calc(o).bal;renewBal=bal>0?bal:0;cur={id:newId(),loan:norm({name:o.name,cedula:o.cedula,tel:o.tel,fotos:[...(o.fotos||[])]}),draft:true};fotosTmp=[...(o.fotos||[])];form="setup";return view()}
+  if(a==="cancel"){form=null;renewBal=0;if(cur.draft)cur=null;return view()}
   if(a==="copy"){try{await navigator.clipboard.writeText(location.origin+location.pathname+"?c="+cur.id);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(["pago","gasto","setup"].includes(a)){form=a;if(a==="setup")fotosTmp=[...(cur.loan.fotos||[])];return view()}
   if(a==="ask-del"){askDel=true;return view()}
@@ -256,7 +311,8 @@ $.addEventListener("click",async e=>{
   if(a==="save-setup"){
     const n=v("f_n").trim(),p=+v("f_p"),r=+v("f_r"),w=+v("f_w"),k=+v("f_k"),d=v("f_d");
     if(!n||!(p>0)||!(w>0)||!(k>0)||!d||r<0){err="Completa nombre, monto, cuotas, días y fecha.";return view()}
-    Object.assign(l,{name:n,cedula:v("f_c").trim(),principal:p,rate:r,cuotas:w,dias:k,start:d,fotos:fotosTmp.slice()});
+    Object.assign(l,{name:n,cedula:v("f_c").trim(),tel:v("f_tel").trim(),principal:p,rate:r,cuotas:w,dias:k,start:d,fotos:fotosTmp.slice()});
+    if(!l.uid)l.uid=auth.currentUser.uid;
     if(JSON.stringify(l).length>900000){err="Las fotos pesan demasiado. Quita alguna.";return view()}
   }else if(a==="save-pago"||a==="save-gasto"){
     const amt=+v("f_a");if(!(amt>0)){err="Escribe un monto válido.";return view()}
@@ -286,23 +342,31 @@ $.addEventListener("input",e=>{
   if(!k)return;simv[k]=e.target.value;const o=document.getElementById("sim_out");if(o)o.innerHTML=simHtml();
 });
 $.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open;if(e.target.id==="wk")showWk=e.target.open},true);
-$.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="f_pw")document.querySelector('[data-act="login"]').click()});
+$.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.target.id==="f_pw"||e.target.id==="f_pw2")){const bt=document.querySelector('[data-act="login"]')||document.querySelector('[data-act="register"]');if(bt)bt.click()}});
 
 // ---- Arranque ----
 const c=q.get("c");
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;if(!owner&&cur)view()});
 if(c){ // vista del cliente: solo lectura, sin sesión
+  try{ // manifiesto propio: la app instalada se abre directo en el préstamo de este cliente
+    const base=location.origin+location.pathname.replace(/[^/]*$/,""),start=base+"?c="+encodeURIComponent(c);
+    const mf={name:"Mi préstamo",short_name:"Mi préstamo",id:start,start_url:start,scope:base,display:"standalone",background_color:"#0a0a0a",theme_color:"#0a0a0a",
+      icons:[{src:base+"icon-192.png",sizes:"192x192",type:"image/png",purpose:"any"},{src:base+"icon-512.png",sizes:"512x512",type:"image/png",purpose:"any"},{src:base+"maskable-512.png",sizes:"512x512",type:"image/png",purpose:"maskable"}]};
+    const lk=document.querySelector('link[rel="manifest"]');if(lk)lk.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:"application/manifest+json"}));
+  }catch(x){}
   onSnapshot(doc(db,"prestamos",c),
     s=>{if(s.exists()){cur={id:c,loan:norm(s.data())};view()}else $.innerHTML=msg("No encontramos este préstamo. Revisa el enlace.")},
     ()=>$.innerHTML=msg("No se pudo cargar. Intenta de nuevo."));
-}else{
+}else if(rcode){registerFlow()}else startOwner();
+function startOwner(){
   onAuthStateChanged(auth,u=>{
     if(unsub){unsub();unsub=null}
     if(!u){owner=false;L={};cur=null;form=null;return askLogin()}
     owner=true;
-    unsub=onSnapshot(collection(db,"prestamos"),
+    unsub=onSnapshot(u.uid===ADMIN?collection(db,"prestamos"):query(collection(db,"prestamos"),where("uid","==",u.uid)),
       s=>{
         L={};s.forEach(d=>L[d.id]=norm(d.data()));
-        if(cur&&cur.loan.name){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
+        if(cur&&!cur.draft){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
         if(!form)view();
       },
       e=>$.innerHTML=msg("No se pudo leer los datos ("+esc(e.code)+"). Revisa las reglas de Firestore."));
