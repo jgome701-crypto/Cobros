@@ -91,7 +91,7 @@ const shrink=async f=>{
   return out};
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(10)),b=>b.toString(16).padStart(2,"0")).join("");
 const msg=t=>'<p class="empty">'+t+'</p>';
-let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,showWk=false,mesOff=0,renewBal=0,deferredInstall=null,invLink="",rcode=q.get("r"),simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"7"};
+let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,showWk=false,mesOff=0,weekOff=0,showWeek=false,renewBal=0,deferredInstall=null,invLink="",rcode=q.get("r"),simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"7"};
 
 function calc(l){
   const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.cuotas||1,per=+l.dias||7,cuota=(p+int)/w;
@@ -140,6 +140,33 @@ function alertHtml(ids){
   if(atr.length)h+='<h2>Atrasados ('+atr.length+')</h2>'+atr.map(i=>row(i,'<small class="late">'+i.x.dias+(i.x.dias==1?" día":" días")+" de atraso</small>","Hola "+i.l.name+", tienes un pago atrasado de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
   if(hoy.length)h+='<h2>Hoy te toca cobrar ('+hoy.length+')</h2>'+hoy.map(i=>row(i,"","Hola "+i.l.name+", te recuerdo que hoy te toca pagar tu cuota de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
   return h||'<div class="note ok">Hoy no tienes cobros ni atrasos ✔</div>';
+}
+function semStats(off,det){
+  const t=new Date();t.setHours(0,0,0,0);t.setDate(t.getDate()-((t.getDay()+6)%7)+off*7);
+  const e=new Date(t);e.setDate(e.getDate()+6);
+  const a=iso(t),b=iso(e);
+  let esp=0,gan=0,cob=0,pend=0;const items=[];
+  for(const id of Object.keys(L)){
+    const l=L[id],c=calc(l),tot=(+l.principal||0)+c.int,r=tot>0?c.int/tot:0;
+    for(const x of l.pagos)if(x.d>=a&&x.d<=b)cob+=x.amt;
+    for(let k=1;k<=(+l.cuotas||0);k++){
+      const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+(+l.dias||7)*k);const di=iso(d);
+      if(di>=a&&di<=b){const cov=c.paid>=k*c.cuota-.5;esp+=c.cuota;gan+=c.cuota*r;if(!cov)pend+=c.cuota;if(det)items.push({name:l.name,amt:c.cuota,d:di,cov,late:!cov&&di<today()})}
+    }
+  }
+  const f=d=>d.toLocaleDateString("es-CO",{day:"numeric",month:"short"});
+  items.sort((p,q)=>p.d<q.d?-1:1);
+  return{label:f(t)+" – "+f(e),esp,gan,cob,pend,items};
+}
+function semHtml(){
+  const w=semStats(weekOff,true),tit=weekOff===0?"Esta semana":weekOff===1?"Próxima semana":weekOff===-1?"Semana pasada":"Semana";
+  const nav='<div class="bar" style="justify-content:space-between;align-items:center"><button class="ghost" data-act="sem" data-d="-1" aria-label="Semana anterior">◀</button><span style="text-align:center"><b>'+tit+'</b><br><small>'+esc(w.label)+'</small></span><button class="ghost" data-act="sem" data-d="1" aria-label="Semana siguiente">▶</button></div>';
+  const st=i=>i.cov?'<span class="ok">Pagada</span>':i.late?'<span class="late">Atrasada</span>':"Pendiente";
+  let prox="";for(let o=0;o<6;o++){const x=semStats(o);prox+='<div class="sr"><span>'+(o===0?"Esta semana":o===1?"Próxima":esc(x.label))+'<br><small>'+(o<2?esc(x.label):"")+'</small></span><span>'+M(x.esp)+'<br><small>ganancia '+M(x.gan)+"</small></span></div>"}
+  return '<section class="cards plan"><details class="big" id="sw"'+(showWeek?" open":"")+'><summary><b style="font-size:16px">Cobro de la semana</b><span class="more">Total a cobrar y ganancia semanal</span></summary><div class="sch">'+nav
+   +'<section class="cards"><div><span>Por cobrar</span><b>'+M(w.esp)+'</b></div><div><span>Ganancia de la semana</span><b>'+M(w.gan)+'</b></div><div><span>Ya cobrado</span><b>'+M(w.cob)+'</b></div><div><span>Falta cobrar</span><b>'+M(w.pend)+'</b></div></section>'
+   +(w.items.length?'<h2>Quién paga</h2>'+w.items.map(i=>'<div class="sr"><span>'+esc(new Date(i.d+"T00:00").toLocaleDateString("es-CO",{weekday:"short",day:"numeric"}))+" · "+esc(i.name)+"</span><span>"+M(i.amt)+" · "+st(i)+"</span></div>").join(""):'<div class="empty">No hay cuotas que venzan esta semana.</div>')
+   +'<h2>Próximas semanas</h2>'+prox+"</div></details></section>";
 }
 function mesDetalle(off){
   const t=new Date();t.setDate(1);t.setMonth(t.getMonth()+off);
@@ -211,7 +238,7 @@ function view(){
       const gi=ids.reduce((x,id)=>x+calc(L[id]).int,0);
       h+='<section class="cards"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b><span>suma de '+ids.length+(ids.length==1?" préstamo":" préstamos")+'</span></div></section>';
     }
-    if(ids.length)h+=alertHtml(ids)+mesHtml();
+    if(ids.length)h+=alertHtml(ids)+semHtml()+mesHtml();
     h+=simBox();
     ids.forEach(id=>{const l=L[id],c=calc(l);h+='<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+(c.bal>0&&c.late>0?'<small class="late">Atrasado: '+M(c.late)+"</small>":c.bal<=0?'<small class="ok">Pagado</small>':"")+"</span><b>"+M(c.bal)+"</b></button>"});
     return $.innerHTML=h+'<div class="bar"><button data-act="new">+ Nuevo préstamo</button></div>'+invBox()+(err?'<div class="err">'+esc(err)+"</div>":"");
@@ -298,6 +325,7 @@ $.addEventListener("click",async e=>{
   if(a==="invite"){const code=newId();try{await setDoc(doc(db,"invitaciones",code),{creado:Date.now(),usado:false});invLink=location.origin+location.pathname+"?r="+code}catch(x){err="No se pudo crear la invitación ("+(x.code||"error")+"). ¿Ya actualizaste las reglas de Firestore?"}return view()}
   if(a==="copy-inv"){try{await navigator.clipboard.writeText(invLink);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(a==="dias"){const k=document.getElementById("f_k");k.value=b.dataset.d;k.dispatchEvent(new Event("input",{bubbles:true}));return}
+  if(a==="sem"){weekOff+=+b.dataset.d;return view()}
   if(a==="mes"){mesOff+=+b.dataset.d;return view()}
   if(a==="rm-foto"){fotosTmp.splice(+b.dataset.i,1);return prev()}
   if(a==="open"){cur={id:b.dataset.id,loan:L[b.dataset.id]};renewBal=0;form=null;askDel=false;zoom=-1;return view()}
@@ -343,7 +371,7 @@ $.addEventListener("input",e=>{
   const k={s_cap:"cap",s_monto:"monto",s_n:"n",s_rate:"rate",s_cuotas:"cuotas",s_dias:"dias"}[e.target.id];
   if(!k)return;simv[k]=e.target.value;const o=document.getElementById("sim_out");if(o)o.innerHTML=simHtml();
 });
-$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open;if(e.target.id==="wk")showWk=e.target.open},true);
+$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open;if(e.target.id==="wk")showWk=e.target.open;if(e.target.id==="sw")showWeek=e.target.open},true);
 $.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.target.id==="f_pw"||e.target.id==="f_pw2")){const bt=document.querySelector('[data-act="login"]')||document.querySelector('[data-act="register"]');if(bt)bt.click()}});
 
 // ---- Arranque ----
