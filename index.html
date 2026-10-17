@@ -52,7 +52,7 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,doc,onSnapshot,setDoc,deleteDoc,query,where,getDoc,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,collection,doc,onSnapshot,setDoc,deleteDoc,query,where,getDoc,getDocs,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app=initializeApp({
   apiKey:"AIzaSyDP2T1g5CDbgGoqnt-QAQI7eL2mjjsDl98",
@@ -277,6 +277,15 @@ function view(){
 }
 function askLogin(m){$.innerHTML='<h1>Entrar</h1><div class="form">'+inp("f_e","Correo","email","",'autocomplete="username"')+inp("f_pw","Contraseña","password","",'autocomplete="current-password"')+(m?'<div class="err">'+m+"</div>":"")+'<button data-act="login">Entrar</button></div>'}
 
+async function migrar(){ // una sola vez: marca como tuyos los préstamos viejos que no tenían dueño
+  if(localStorage.getItem("cobros_mig1"))return;
+  try{
+    const sn=await getDocs(collection(db,"prestamos")),bt=writeBatch(db);let n=0;
+    sn.forEach(d=>{if(!d.data().uid){bt.update(d.ref,{uid:ADMIN});n++}});
+    if(n)await bt.commit();
+    localStorage.setItem("cobros_mig1","1");
+  }catch(x){}
+}
 function askRegister(m){$.innerHTML='<h1>Crear cuenta</h1><p class="sub">Te invitaron a usar la app de cobros. Crea tu usuario para empezar.</p><div class="form">'+inp("f_e","Correo","email","",'autocomplete="username"')+inp("f_pw","Contraseña (mínimo 6 caracteres)","password","",'autocomplete="new-password"')+inp("f_pw2","Repite la contraseña","password","",'autocomplete="new-password"')+(m?'<div class="err">'+esc(m)+"</div>":"")+'<button data-act="register">Crear mi cuenta</button></div>'}
 async function registerFlow(){
   try{const s=await getDoc(doc(db,"invitaciones",rcode));
@@ -393,7 +402,8 @@ function startOwner(){
     if(unsub){unsub();unsub=null}
     if(!u){owner=false;L={};cur=null;form=null;return askLogin()}
     owner=true;
-    unsub=onSnapshot(u.uid===ADMIN?collection(db,"prestamos"):query(collection(db,"prestamos"),where("uid","==",u.uid)),
+    if(u.uid===ADMIN)migrar();
+    unsub=onSnapshot(query(collection(db,"prestamos"),where("uid","==",u.uid)),
       s=>{
         L={};s.forEach(d=>L[d.id]=norm(d.data()));
         if(cur&&!cur.draft){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
