@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#0a0a0a">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-:root{--bg:#faf8f4;--fg:#1f2a24;--mut:#6b7570;--card:#fff;--bd:#e4e0d6;--ac:#1d7a55;--bad:#b3261e}
-@media (prefers-color-scheme:dark){:root{--bg:#15191a;--fg:#e8ece9;--mut:#9aa5a0;--card:#1e2426;--bd:#2d3638;--ac:#4fbf8f;--bad:#ff8a80}}
+:root{color-scheme:dark;--bg:#0b0b0c;--fg:#f3ecda;--mut:#a89f8a;--card:#17150f;--bd:#2f2a1b;--ac:#d4af37;--bad:#ff8a80;--ok:#4fbf8f}
+
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 #root{max-width:560px;margin:0 auto;padding:12px 14px}
@@ -32,9 +32,9 @@ summary b{font-size:20px}.more{color:var(--ac)!important;margin-top:4px}.more::a
 .prog{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin:10px 0 0}
 .prog i{display:block;height:100%;background:var(--ac)}
 .note{margin:8px 0;padding:8px 12px;border-radius:12px;background:var(--card);border:1px solid var(--bd)}
-.late{color:var(--bad);font-weight:600}.ok{color:var(--ac);font-weight:600}
+.late{color:var(--bad);font-weight:600}.ok{color:var(--ok);font-weight:600}
 .bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
-button,.btn{font:inherit;padding:9px 14px;border-radius:10px;border:0;background:var(--ac);color:#fff;cursor:pointer;text-decoration:none;display:inline-block}
+button,.btn{font:inherit;padding:9px 14px;border-radius:10px;border:0;background:var(--ac);color:#14110a;cursor:pointer;text-decoration:none;display:inline-block}
 button.ghost,.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--bd)}
 button.x{padding:2px 8px;background:transparent;color:var(--mut)}
 button:disabled{opacity:.6}
@@ -50,6 +50,11 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .cards .sr span span{display:inline;font-size:inherit}
 .mas button,.mas .btn{margin:0}.tabs{display:flex;gap:6px;margin:10px 0}.tabs button{flex:1;padding:7px 6px}
 .item small{display:block}
+#root{padding-bottom:100px}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:7;display:flex;justify-content:space-around;align-items:flex-end;background:var(--card);border-top:1px solid var(--bd);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.nav button{background:none;color:var(--mut);display:grid;gap:2px;justify-items:center;font-size:11px;padding:4px 10px;border-radius:10px}
+.nav button.on{color:var(--ac)}.nav svg{width:24px;height:24px}
+.nav .plus{background:var(--ac);color:#14110a;width:52px;height:52px;border-radius:99px;margin-top:-22px;padding:0;font-size:28px;line-height:1;place-items:center;border:4px solid var(--bg)}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
@@ -100,6 +105,8 @@ let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=
   RAW={},P={},privOK=null,unsub2=null,migPriv=false,lockErr="",hiddenAt=0;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(x){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(x){}},del:k=>{try{localStorage.removeItem(k)}catch(x){}}};
 let pinHash=ls.get("cobros_pin")||"",locked=!!pinHash;
+let nav="inicio",filt="todos",showNotif=false,hide=ls.get("cobros_hide")==="1";
+addEventListener("perfil",()=>{if(owner&&!cur&&!form&&!showNotif)view()});
 const sha=async t=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros:"+t))),b=>b.toString(16).padStart(2,"0")).join("");
 const Fc=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}):"";
 const norm2=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
@@ -244,7 +251,7 @@ function panelHtml(){
 }
 function resumenHtml(ids){
   const tot=ids.reduce((x,id)=>x+Math.max(0,calc(L[id]).bal),0),prest=ids.reduce((x,id)=>x+(+L[id].principal||0),0),gi=ids.reduce((x,id)=>x+calc(L[id]).int,0),cob=ids.reduce((x,id)=>x+calc(L[id]).paid,0),act=ids.filter(id=>calc(L[id]).bal>0).length;
-  return '<section class="cards plan" style="margin-top:0"><details class="big" id="rs"'+(showRes?" open":"")+'><summary><span>Por cobrar en total</span><b>'+M(tot)+'</b><span class="more">Ver resumen</span></summary><div class="sch"><section class="cards" style="margin-top:10px"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b></div><div><span>Ya cobrado</span><b>'+M(cob)+'</b></div><div><span>Préstamos activos</span><b>'+act+'</b></div></section></div></details></section>';
+  return '<section class="cards plan" style="margin-top:0"><details class="big" id="rs"'+(showRes?" open":"")+'><summary><button class="xeye" data-act="eye" aria-label="Mostrar u ocultar el monto">'+(hide?IEYEC:IEYE)+'</button><span>Por cobrar en total</span><b>'+(hide?"••••••":M(tot))+'</b><span class="more">Ver resumen</span></summary><div class="sch"><section class="cards" style="margin-top:10px"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b></div><div><span>Ya cobrado</span><b>'+M(cob)+'</b></div><div><span>Préstamos activos</span><b>'+act+'</b></div></section></div></details></section>';
 }
 function infoLista(id){const l=L[id],c=calc(l);return{id,l,c,d:c.bal>0?dueInfo(l,c):{late:null,hoy:null}}}
 function filaHtml(x){
@@ -257,7 +264,8 @@ function filaHtml(x){
 }
 function listaHtml(){
   const qq=norm2(busca);
-  const arr=Object.keys(L).map(infoLista).filter(x=>!qq||norm2(x.l.name).includes(qq)||String(x.l.tel||"").includes(qq));
+  const we=(()=>{const t=new Date();t.setDate(t.getDate()+(7-t.getDay())%7);return iso(t)})(),fo=x=>filt==="todos"||(x.c.bal>0&&(filt==="atr"?!!x.d.late:filt==="hoy"?!!x.d.hoy:!!(x.d.late||x.d.hoy||(x.c.next&&x.c.next<=we))));
+  const arr=Object.keys(L).map(infoLista).filter(x=>fo(x)&&(!qq||norm2(x.l.name).includes(qq)||String(x.l.tel||"").includes(qq)));
   const rk=x=>x.d.late?0:x.d.hoy?1:2;
   const act=arr.filter(x=>x.c.bal>0).sort((a,b)=>rk(a)-rk(b)||(rk(a)===0?b.d.late.dias-a.d.late.dias:((a.c.next||"9999")<(b.c.next||"9999")?-1:1)));
   const pag=arr.filter(x=>x.c.bal<=0).sort((a,b)=>a.l.name.localeCompare(b.l.name));
@@ -333,15 +341,53 @@ async function persist(id,loan){
     await race(bt.commit());
   }else await race(setDoc(doc(db,"prestamos",id),loan));
 }
+const SV=d=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';
+const IUSER=SV('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>'),IBELL=SV('<path d="M6 17v-6a6 6 0 0 1 12 0v6M4 17h16M10 20.5h4"/>'),IEYE=SV('<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),IEYEC=SV('<path d="M3 11c2.5 3.5 6 5 9 5s6.5-1.5 9-5M6 14.5 4 17M12 16v3M18 14.5l2 2.5"/>');
+const PF=()=>{try{return JSON.parse(ls.get("cobros_perfil_"+(auth.currentUser&&auth.currentUser.uid))||"{}")}catch(x){return{}}};
+const nCount=ids=>ids.filter(id=>{const c=calc(L[id]);if(c.bal<=0)return false;const d=dueInfo(L[id],c);return d.late||d.hoy}).length;
+function topHtml(n){const p=PF();return '<div class="xtop"><button class="xib" data-x="perfil" aria-label="Mi perfil">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':IUSER)+'</button><b>'+esc(p.negocio||"Cobros")+'</b><button class="xib" data-act="notif" aria-label="Notificaciones'+(n?" ("+n+")":"")+'">'+IBELL+(n?'<i class="xdot"></i>':"")+"</button></div>"}
+function navHtml(){
+  const t=(k,l,d)=>'<button class="'+(nav===k?"on":"")+'" data-act="nav" data-t="'+k+'">'+SV(d)+l+"</button>";
+  return '<nav class="nav">'+t("inicio","Inicio",'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>')+t("cobros","Cobros",'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>')+'<button class="plus" data-act="new" aria-label="Nuevo préstamo">＋</button>'+t("clientes","Clientes",'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>')+t("mas","Más",'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>')+"</nav>";
+}
+function sheetHtml(ids){
+  if(!showNotif)return"";
+  return '<div class="xsheet"><div class="xbk" data-act="close-sheet"></div><div class="xsc"><div class="xhd"><h1>Notificaciones</h1><button class="ghost" data-act="close-sheet">Cerrar</button></div>'+alertHtml(ids)+(avisosOK()&&!ls.get("cobros_push_owner")?'<div class="bar"><button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button></div>':"")+"</div></div>";
+}
+function inicioHtml(ids){
+  if(!ids.length)return msg("Aún no tienes préstamos. Toca el botón ＋ para crear el primero.");
+  return resumenHtml(ids)+alertHtml(ids);
+}
+function cobrosHtml(){
+  const fb=(k,l)=>'<button class="'+(filt===k?"":"ghost")+'" data-act="filt" data-k="'+k+'">'+l+"</button>";
+  return panelHtml()+'<div class="tabs" style="flex-wrap:wrap">'+fb("todos","Todos")+fb("atr","Atrasados")+fb("hoy","Hoy")+fb("sem","Esta semana")+'</div><input id="q_busca" type="search" placeholder="Buscar por nombre…" value="'+esc(busca)+'"><div id="lista">'+listaHtml()+"</div>"+recientesHtml();
+}
+function recientesHtml(){
+  const r=[];Object.keys(L).forEach(id=>L[id].pagos.forEach((x,i)=>r.push({id,i,n:L[id].name,x})));
+  r.sort((a,b)=>a.x.d<b.x.d?1:-1);if(!r.length)return"";
+  return "<h2>Pagos recientes</h2>"+r.slice(0,5).map(o=>'<div class="row"><div><b>'+M(o.x.amt)+"</b> · "+esc(o.n)+"<br><small>"+F(o.x.d)+'</small></div><button class="ghost" data-act="undo" data-id="'+o.id+'" data-i="'+o.i+'">↩ Deshacer</button></div>').join("");
+}
+function clientesLista(){
+  const g={};Object.keys(L).forEach(id=>{const k=norm2(L[id].name);(g[k]=g[k]||{name:L[id].name,ids:[]}).ids.push(id)});
+  const qq=norm2(busca),arr=Object.values(g).filter(x=>!qq||norm2(x.name).includes(qq)).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!arr.length)return '<div class="empty">Nadie coincide.</div>';
+  return arr.map(x=>{const bal=x.ids.reduce((t,id)=>t+Math.max(0,calc(L[id]).bal),0),atr=x.ids.some(id=>{const c=calc(L[id]);return c.bal>0&&dueInfo(L[id],c).late});
+    return '<details class="pag"><summary><b>'+esc(x.name)+"</b> · "+M(bal)+(atr?' <span class="late">atrasado</span>':"")+" · "+x.ids.length+(x.ids.length==1?" préstamo":" préstamos")+'<span class="more"></span></summary>'+x.ids.map(id=>filaHtml(infoLista(id))).join("")+"</details>"}).join("");
+}
+function clientesHtml(){return '<h2>Clientes</h2><input id="q_busca" type="search" placeholder="Buscar por nombre…" value="'+esc(busca)+'"><div id="lista">'+clientesLista()+"</div>"}
+function reportesHtml(ids){
+  const calle=ids.reduce((t,id)=>t+Math.max(0,calc(L[id]).bal),0),atr=ids.reduce((t,id)=>{const c=calc(L[id]);return t+(c.bal>0?Math.min(c.late,c.bal):0)},0),mes={};
+  ids.forEach(id=>{const l=L[id],c=calc(l),tot=(+l.principal||0)+c.int,r=tot>0?c.int/tot:0;l.pagos.forEach(p=>{const k=(p.d||"").slice(0,7);mes[k]=(mes[k]||0)+p.amt*r})});
+  const ks=Object.keys(mes).sort().slice(-6).reverse();
+  return '<h2>Reportes</h2><section class="cards"><div><span>Plata en la calle</span><b>'+M(calle)+'</b></div><div><span>Atrasado</span><b class="late">'+(calle>0?Math.round(atr/calle*100):0)+'%</b><span>'+M(atr)+'</span></div></section><h2>Ganancia cobrada por mes</h2><section class="cards" style="display:block">'+(ks.length?ks.map(k=>'<div class="sr"><span>'+esc(new Date(k+"-01T00:00").toLocaleDateString("es-CO",{month:"long",year:"numeric"}))+"</span><span>"+M(mes[k])+"</span></div>").join(""):'<div class="empty">Aún no hay pagos.</div>')+"</section>";
+}
 function view(){
   if(owner&&locked&&pinHash)return $.innerHTML=lockHtml();
   if(owner&&!cur){
     const ids=Object.keys(L);
-    let h='<div class="bar" style="justify-content:space-between;align-items:center;margin:0 0 8px"><h1>Mis préstamos</h1><span style="display:flex;gap:6px"><button data-act="new">＋ Nuevo</button><button class="ghost" data-act="logout">Salir</button></span></div>';
-    h+=reciboHtml();
-    if(!ids.length)h+=msg("Aún no tienes préstamos. Toca «＋ Nuevo» para crear el primero.")+panelHtml();
-    else h+=resumenHtml(ids)+alertHtml(ids)+panelHtml()+'<div style="margin:10px 0 0"><input id="q_busca" type="search" placeholder="Buscar por nombre…" value="'+esc(busca)+'"></div><div id="lista">'+listaHtml()+"</div>";
-    return $.innerHTML=h+masHtml()+(err?'<div class="err">'+esc(err)+"</div>":"");
+    let h=topHtml(nCount(ids))+reciboHtml();
+    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?reportesHtml(ids)+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
+    return $.innerHTML=h+(err?'<div class="err">'+esc(err)+"</div>":"")+navHtml()+sheetHtml(ids);
   }
   const l=cur.loan,c=calc(l);let h="";
   if(owner)h+='<div class="bar"><button class="ghost" data-act="back">← Todos</button></div>';
@@ -447,6 +493,12 @@ $.addEventListener("click",async e=>{
   if(a==="unzoom"){zoom=-1;return view()}
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
+  if(a==="nav"){nav=b.dataset.t;showMas=nav==="mas";showNotif=false;scrollTo(0,0);return view()}
+  if(a==="notif"){showNotif=true;return view()}
+  if(a==="close-sheet"){showNotif=false;return view()}
+  if(a==="filt"){filt=b.dataset.k;return view()}
+  if(a==="eye"){e.preventDefault();hide=!hide;ls.set("cobros_hide",hide?"1":"0");return view()}
+  if(a==="undo"){const id=b.dataset.id,l0=L[id];if(!l0||!confirm("¿Deshacer este pago?"))return;const l=structuredClone(l0);l.pagos.splice(+b.dataset.i,1);b.disabled=true;try{await persist(id,l);L[id]=l;RAW[id]=Object.assign({},RAW[id]||{},{pagos:l.pagos})}catch(x){err="No se pudo deshacer ("+(x.code||"error")+")."}return view()}
   if(a==="push-owner"){b.disabled=true;await activarAvisos("prestamista");showMas=true;return view()}
   if(a==="unlock"){const h=await sha(v("f_pin").trim());if(h===pinHash){locked=false;lockErr=""}else lockErr="PIN incorrecto.";return view()}
   if(a==="forgot-pin"){if(confirm("Para entrar sin el PIN tienes que volver a iniciar sesión con tu contraseña. ¿Continuar?")){pinHash="";ls.del("cobros_pin");locked=false;lockErr="";signOut(auth)}return}
@@ -484,7 +536,7 @@ $.addEventListener("click",async e=>{
   if(a==="sem"){weekOff+=+b.dataset.d;return view()}
   if(a==="mes"){mesOff+=+b.dataset.d;return view()}
   if(a==="rm-foto"){fotosTmp.splice(+b.dataset.i,1);return prev()}
-  if(a==="open"){cur={id:b.dataset.id,loan:L[b.dataset.id]};renewBal=0;form=null;askDel=false;zoom=-1;return view()}
+  if(a==="open"){showNotif=false;cur={id:b.dataset.id,loan:L[b.dataset.id]};renewBal=0;form=null;askDel=false;zoom=-1;return view()}
   if(a==="back"){cur=null;form=null;renewBal=0;return view()}
   if(a==="new"){cur={id:newId(),loan:norm(),draft:true};renewBal=0;form="setup";fotosTmp=[];return view()}
   if(a==="renew"){const o=cur.loan,bal=calc(o).bal;renewBal=bal>0?bal:0;cur={id:newId(),loan:norm({name:o.name,cedula:o.cedula,tel:o.tel,fotos:[...(o.fotos||[])]}),draft:true};fotosTmp=[...(o.fotos||[])];form="setup";return view()}
@@ -520,7 +572,7 @@ $.addEventListener("change",async e=>{
   if(m)m.textContent=full?"Máximo 4 fotos. Quita una (✕) para agregar otra.":bad?"No se pudo leer "+bad+" foto(s). Si la tomaste con la cámara, elígela desde la galería o toma la foto en formato JPG.":"";
 });
 $.addEventListener("input",e=>{
-  if(e.target.id==="q_busca"){busca=e.target.value;const o=document.getElementById("lista");if(o)o.innerHTML=listaHtml();return}
+  if(e.target.id==="q_busca"){busca=e.target.value;const o=document.getElementById("lista");if(o)o.innerHTML=nav==="clientes"?clientesLista():listaHtml();return}
   if(["f_p","f_r","f_w","f_k","f_d"].includes(e.target.id)){
     const o=document.getElementById("f_sim"),g=id=>+(document.getElementById(id)||{}).value||0;
     if(o)o.innerHTML=newSimHtml(g("f_p"),g("f_r"),g("f_w"),g("f_k")||7,(document.getElementById("f_d")||{}).value||today());
@@ -635,7 +687,7 @@ function clientView(){
 }
 function enhance(){
   if(busy)return;busy=true;obs.disconnect();
-  try{ownerView();clientView()}catch(x){}
+  try{clientView()}catch(x){}
   obs.observe(R,{childList:true});busy=false;
 }
 
@@ -667,7 +719,7 @@ document.addEventListener("click",async e=>{
   if(a==="guardar"){
     const g=id=>document.getElementById(id).value.trim(),m=document.getElementById("xp_m");
     perfil={nombre:g("xp_n"),negocio:g("xp_neg"),ciudad:g("xp_ciu"),wa:g("xp_wa"),pago:g("xp_pago"),foto};
-    ls.set("cobros_perfil_"+uid,JSON.stringify(perfil));paintTop();b.disabled=true;m.textContent="Guardando…";
+    ls.set("cobros_perfil_"+uid,JSON.stringify(perfil));paintTop();dispatchEvent(new Event("perfil"));b.disabled=true;m.textContent="Guardando…";
     try{await Promise.race([setDoc(doc(db,"perfiles",uid),perfil),new Promise((_,no)=>setTimeout(()=>no({code:"sin respuesta"}),6000))]);m.textContent="Perfil guardado ✓"}
     catch(x){m.textContent="Se guardó en este celular, pero no se pudo publicar para tus clientes ("+(x.code||"error")+"). Falta actualizar las reglas de Firestore."}
     b.disabled=false;
@@ -686,7 +738,7 @@ onAuthStateChanged(auth,u=>{
   uid=u?u.uid:null;perfil={};
   if(u){
     try{perfil=JSON.parse(ls.get("cobros_perfil_"+u.uid)||"{}")}catch(x){}
-    getDoc(doc(db,"perfiles",u.uid)).then(d=>{if(d.exists()){perfil=d.data();ls.set("cobros_perfil_"+u.uid,JSON.stringify(perfil));paintTop()}}).catch(()=>{});
+    getDoc(doc(db,"perfiles",u.uid)).then(d=>{if(d.exists()){perfil=d.data();ls.set("cobros_perfil_"+u.uid,JSON.stringify(perfil));paintTop();dispatchEvent(new Event("perfil"))}}).catch(()=>{});
   }else closePerfil();
   paintTop();
 });
