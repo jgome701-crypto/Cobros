@@ -307,7 +307,7 @@ function reciboHtml(){
   return '<div class="note"><b>Pago registrado</b> · '+esc(l.name)+" "+M(lastPay.amt)+'<div class="bar" style="margin:8px 0 0"><a class="btn" target="_blank" rel="noopener" href="'+waLink(l,txt)+'">Enviar comprobante</a><button class="ghost" data-act="close-rec">Cerrar</button></div></div>';
 }
 function masHtml(){
-  return '<details class="pag mas" id="ms"'+(showMas?" open":"")+'><summary>Más opciones<span class="more"></span></summary><div class="bar"><button class="ghost" data-act="exp-prest">Descargar préstamos (Excel)</button><button class="ghost" data-act="exp-pagos">Descargar pagos (Excel)</button><button class="ghost" data-act="exp-json">Respaldo completo</button></div>'
+  return '<details class="pag mas" id="ms"'+(showMas?" open":"")+'><summary>Más opciones<span class="more"></span></summary><div class="bar"><button class="ghost" data-act="exp-prest">Descargar préstamos (Excel)</button><button class="ghost" data-act="exp-pagos">Descargar pagos (Excel)</button><button class="ghost" data-act="exp-todo">Respaldo completo (Excel)</button><button class="ghost" data-act="exp-json">Copia técnica (JSON)</button></div>'
    +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+"</div>"+(avisosOK()?'<div class="bar">'+(ls.get("cobros_push_owner")?'<span class="ok">🔔 Avisos activados en este celular ✓</span>':'<button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button>')+"</div>":"")+invBox()+"</details>";
 }
 function lockHtml(){
@@ -535,6 +535,112 @@ async function migrarPriv(){ // mueve cédula y fotos viejas a un documento priv
   if(!falt.length)return;migPriv=true;
   try{for(let i=0;i<falt.length;i+=4){const bt=writeBatch(db);falt.slice(i,i+4).forEach(id=>{const r=RAW[id];bt.set(doc(db,"privados",id),{uid:r.uid||auth.currentUser.uid,cedula:r.cedula||"",fotos:r.fotos||[]});bt.update(doc(db,"prestamos",id),{cedula:deleteField(),fotos:deleteField(),cedulaUlt:String(r.cedula||"").slice(-3)})});await bt.commit()}}catch(x){}
 }
+// ---- Excel (.xlsx) real, con colores, anchos y totales ----
+const _crcT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let k=n;for(let i=0;i<8;i++)k=k&1?0xEDB88320^(k>>>1):k>>>1;t[n]=k>>>0}return t})();
+const _crc=b=>{let k=0xFFFFFFFF;for(let i=0;i<b.length;i++)k=_crcT[(k^b[i])&255]^(k>>>8);return(k^0xFFFFFFFF)>>>0};
+function zipStore(files){
+  const te=new TextEncoder(),parts=[],cen=[];let off=0;
+  const u16=v=>[v&255,(v>>8)&255],u32=v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  files.forEach(f=>{
+    const nm=te.encode(f.n),d=te.encode(f.d),cr=_crc(d);
+    const lh=new Uint8Array([0x50,0x4b,3,4,...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(cr),...u32(d.length),...u32(d.length),...u16(nm.length),...u16(0)]);
+    parts.push(lh,nm,d);
+    cen.push(new Uint8Array([0x50,0x4b,1,2,...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(cr),...u32(d.length),...u32(d.length),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nm);
+    off+=lh.length+nm.length+d.length;
+  });
+  const cs=cen.reduce((t,x)=>t+x.length,0);
+  parts.push(...cen,new Uint8Array([0x50,0x4b,5,6,0,0,0,0,...u16(files.length),...u16(files.length),...u32(cs),...u32(off),0,0]));
+  return new Blob(parts,{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+const COLL=n=>{let s="";n++;while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26)}return s};
+const xe=t=>String(t==null?"":t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const serialF=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d||"");return m?(Date.UTC(+m[1],+m[2]-1,+m[3])-Date.UTC(1899,11,30))/864e5:null};
+const XNS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',XH='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+function xStyles(){
+  const xf=(nf,f,fi,b,al)=>'<xf numFmtId="'+nf+'" fontId="'+f+'" fillId="'+fi+'" borderId="'+b+'" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment '+al+"/></xf>";
+  const vc='vertical="center"',cc='horizontal="center" vertical="center"';
+  const fnt=(b,col)=>"<font>"+(b?"<b/>":"")+'<sz val="11"/>'+(col?'<color rgb="'+col+'"/>':"")+'<name val="Calibri"/></font>';
+  const fill=c=>'<fill><patternFill patternType="solid"><fgColor rgb="'+c+'"/><bgColor indexed="64"/></patternFill></fill>';
+  return XH+"<styleSheet "+XNS+'><numFmts count="2"><numFmt numFmtId="164" formatCode="&quot;$&quot; #,##0"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/></numFmts>'
+   +'<fonts count="7">'+fnt(0)+fnt(1,"FFFFFFFF")+fnt(0)+fnt(1,"FF9C0006")+fnt(1,"FF006100")+fnt(1,"FF1F3864")+fnt(1)+"</fonts>"
+   +'<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+fill("FF1F3864")+fill("FFF2F2F2")+fill("FFFFC7CE")+fill("FFC6EFCE")+fill("FFDDEBF7")+fill("FFFFF2CC")+"</fills>"
+   +'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD9D9D9"/></left><right style="thin"><color rgb="FFD9D9D9"/></right><top style="thin"><color rgb="FFD9D9D9"/></top><bottom style="thin"><color rgb="FFD9D9D9"/></bottom><diagonal/></border></borders>'
+   +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="15">'
+   +xf(0,0,0,0,vc)+xf(0,1,2,1,'horizontal="center" vertical="center" wrapText="1"')+xf(0,0,0,1,vc)+xf(0,0,3,1,vc)+xf(164,0,0,1,vc)+xf(164,0,3,1,vc)+xf(165,0,0,1,cc)+xf(165,0,3,1,cc)+xf(0,0,0,1,cc)+xf(0,0,3,1,cc)
+   +xf(0,3,4,1,cc)+xf(0,4,5,1,cc)+xf(0,5,6,1,cc)+xf(0,6,7,1,vc)+xf(164,6,7,1,vc)
+   +'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+}
+function xSheet(sp,first){
+  const SM={txt:[2,3],money:[4,5],date:[6,7],int:[8,9]};
+  const txt=(r,s,v)=>v===""||v==null?'<c r="'+r+'" s="'+s+'"/>':'<c r="'+r+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+xe(v)+"</t></is></c>";
+  const num=(r,s,v)=>Number.isFinite(+v)&&v!==""&&v!=null?'<c r="'+r+'" s="'+s+'"><v>'+(+v)+"</v></c>":'<c r="'+r+'" s="'+s+'"/>';
+  let x=XH+"<worksheet "+XNS+'><sheetViews><sheetView showGridLines="0" workbookViewId="0"'+(first?' tabSelected="1"':"")+'><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="18"/><cols>'
+   +sp.cols.map((c,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+c.w+'" customWidth="1"/>').join("")+'</cols><sheetData><row r="1" ht="30" customHeight="1">'
+   +sp.cols.map((c,i)=>txt(COLL(i)+"1",1,c.h)).join("")+"</row>";
+  sp.rows.forEach((row,ri)=>{
+    const band=ri%2,R=ri+2;
+    x+='<row r="'+R+'" ht="20" customHeight="1">'+sp.cols.map((col,ci)=>{
+      const cv=Array.isArray(row[ci])?row[ci]:[col.t,row[ci]],t=cv[0],v=cv[1],ref=COLL(ci)+R;
+      if(t==="est")return txt(ref,/atras/i.test(v)?10:/pagad/i.test(v)?11:12,v);
+      const s=SM[t][band];
+      if(t==="txt")return txt(ref,s,v);
+      if(t==="date"){const n=serialF(v);return num(ref,s,n==null?"":n)}
+      return num(ref,s,v);
+    }).join("")+"</row>";
+  });
+  if(sp.total&&sp.rows.length){
+    const R=sp.rows.length+2;
+    x+='<row r="'+R+'" ht="22" customHeight="1">'+sp.cols.map((col,ci)=>{
+      const ref=COLL(ci)+R;
+      if(ci===0)return txt(ref,13,"TOTAL");
+      if(sp.total.sum.includes(ci))return num(ref,14,sp.rows.reduce((t,r)=>t+(+r[ci]||0),0));
+      return '<c r="'+ref+'" s="13"/>';
+    }).join("")+"</row>";
+  }
+  return x+"</sheetData></worksheet>";
+}
+function xlsx(hojas){
+  const n=hojas.length,RN="http://schemas.openxmlformats.org/officeDocument/2006/relationships",PR="http://schemas.openxmlformats.org/package/2006/relationships";
+  const files=[
+    {n:"[Content_Types].xml",d:XH+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+hojas.map((h,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("")+"</Types>"},
+    {n:"_rels/.rels",d:XH+'<Relationships xmlns="'+PR+'"><Relationship Id="rId1" Type="'+RN+'/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+    {n:"xl/workbook.xml",d:XH+"<workbook "+XNS+' xmlns:r="'+RN+'"><sheets>'+hojas.map((h,i)=>'<sheet name="'+xe(h.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join("")+"</sheets></workbook>"},
+    {n:"xl/_rels/workbook.xml.rels",d:XH+'<Relationships xmlns="'+PR+'">'+hojas.map((h,i)=>'<Relationship Id="rId'+(i+1)+'" Type="'+RN+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join("")+'<Relationship Id="rId'+(n+1)+'" Type="'+RN+'/styles" Target="styles.xml"/></Relationships>'},
+    {n:"xl/styles.xml",d:xStyles()}
+  ];
+  hojas.forEach((h,i)=>files.push({n:"xl/worksheets/sheet"+(i+1)+".xml",d:xSheet(h,i===0)}));
+  return zipStore(files);
+}
+function bajarXlsx(nombre,hojas){const u=URL.createObjectURL(xlsx(hojas)),a=document.createElement("a");a.href=u;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+const estadoL=c=>c.bal<=0?"Pagado":c.late>0?"Atrasado":"Al día";
+function hojaResumen(){
+  const ids=Object.keys(L),cs=ids.map(id=>calc(L[id])),sm=f=>Math.round(cs.reduce((t,c,i)=>t+f(c,L[ids[i]]),0));
+  return{name:"Resumen",cols:[{h:"Concepto",w:34,t:"txt"},{h:"Valor",w:22,t:"money"}],rows:[
+    ["Fecha del reporte",["date",today()]],["Préstamos registrados",["int",ids.length]],["Préstamos activos",["int",cs.filter(c=>c.bal>0).length]],
+    ["Total prestado",sm((c,l)=>+l.principal||0)],["Ganancia (intereses)",sm(c=>c.int)],["Ya cobrado",sm(c=>c.paid)],
+    ["Plata en la calle (por cobrar)",sm(c=>Math.max(0,c.bal))],["Atrasado",sm(c=>c.bal>0?Math.min(c.late,c.bal):0)]]};
+}
+function hojaPrest(){
+  const rk={"Atrasado":0,"Al día":1,"Pagado":2};
+  const rows=Object.keys(L).map(id=>{const l=L[id],c=calc(l),e=estadoL(c);return{e,r:[l.name,l.cedula||"",l.tel||"",l.start,+l.principal||0,+l.rate||0,Math.round(c.int),+l.cuotas||0,+l.dias||7,Math.round(c.cuota),c.paid,c.g,Math.round(c.bal),c.bal>0?c.next||"":"",e]}});
+  rows.sort((a,b)=>rk[a.e]-rk[b.e]||String(a.r[0]).localeCompare(String(b.r[0])));
+  return{name:"Préstamos",cols:[{h:"Nombre",w:24,t:"txt"},{h:"Cédula",w:14,t:"txt"},{h:"Celular",w:16,t:"txt"},{h:"Fecha del préstamo",w:16,t:"date"},{h:"Prestado",w:15,t:"money"},{h:"Interés %",w:10,t:"int"},{h:"Interés $",w:14,t:"money"},{h:"Cuotas",w:9,t:"int"},{h:"Cada (días)",w:11,t:"int"},{h:"Valor cuota",w:14,t:"money"},{h:"Pagado",w:14,t:"money"},{h:"Gastos",w:13,t:"money"},{h:"Saldo",w:15,t:"money"},{h:"Próximo cobro",w:15,t:"date"},{h:"Estado",w:12,t:"est"}],rows:rows.map(x=>x.r),total:{sum:[4,6,10,11,12]}};
+}
+function hojaCuotas(){
+  const r=[];Object.keys(L).forEach(id=>{const l=L[id],c=calc(l);if(!l.start)return;sched(l,c).forEach(x=>r.push([x.d,l.name,l.start,x.k,Math.round(c.cuota),x.cov?"Pagada":x.late?"Atrasada":"Pendiente"]))});
+  r.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:String(a[1]).localeCompare(String(b[1])));
+  return{name:"Cuotas",cols:[{h:"Fecha de cobro",w:16,t:"date"},{h:"Cliente",w:24,t:"txt"},{h:"Préstamo del",w:15,t:"date"},{h:"Cuota #",w:9,t:"int"},{h:"Valor cuota",w:15,t:"money"},{h:"Estado",w:13,t:"est"}],rows:r};
+}
+function hojaPagos(){
+  const r=[];Object.keys(L).forEach(id=>L[id].pagos.forEach(x=>r.push([x.d,L[id].name,x.amt,x.n||""])));
+  r.sort((a,b)=>a[0]<b[0]?1:a[0]>b[0]?-1:0);
+  return{name:"Pagos",cols:[{h:"Fecha",w:15,t:"date"},{h:"Persona",w:26,t:"txt"},{h:"Monto",w:16,t:"money"},{h:"Nota",w:28,t:"txt"}],rows:r,total:{sum:[2]}};
+}
+function hojaGastos(){
+  const r=[];Object.keys(L).forEach(id=>L[id].gastos.forEach(x=>r.push([x.d,L[id].name,x.desc||"",x.amt])));
+  r.sort((a,b)=>a[0]<b[0]?1:a[0]>b[0]?-1:0);
+  return{name:"Gastos",cols:[{h:"Fecha",w:15,t:"date"},{h:"Persona",w:26,t:"txt"},{h:"Descripción",w:28,t:"txt"},{h:"Monto",w:16,t:"money"}],rows:r,total:{sum:[3]}};
+}
 $.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act,v=id=>document.getElementById(id).value;
   if(a==="login"){b.disabled=true;try{await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"));locked=false}catch(x){askLogin("Correo o contraseña incorrectos.")}return}
@@ -590,18 +696,10 @@ $.addEventListener("click",async e=>{
     const amt=Math.round(+b.dataset.amt||0);if(!(amt>0))return;
     const l=structuredClone(cur.loan);l.gastos.push({d:today(),amt,desc:"Mora",mora:true});b.disabled=true;return save(l);
   }
-  if(a==="exp-prest"){
-    const rows=[["Nombre","Cédula","Celular","Fecha del préstamo","Prestado","Interés %","Interés $","Cuotas","Cada (días)","Valor cuota","Pagado","Gastos","Saldo","Próximo cobro","Estado"]];
-    Object.keys(L).forEach(id=>{const l=L[id],c=calc(l);rows.push([l.name,l.cedula,l.tel,l.start,l.principal,l.rate,Math.round(c.int),l.cuotas,l.dias,Math.round(c.cuota),c.paid,c.g,Math.round(c.bal),c.bal>0?c.next||"":"",c.bal<=0?"Pagado":c.late>0?"Atrasado":"Al día"])});
-    descargar("prestamos-"+today()+".csv",csv(rows),"text/csv;charset=utf-8",true);return;
-  }
-  if(a==="exp-pagos"){
-    const rows=[["Fecha","Persona","Monto","Nota"]];
-    Object.keys(L).forEach(id=>L[id].pagos.forEach(x=>rows.push([x.d,L[id].name,x.amt,x.n||""])));
-    rows.splice(1,rows.length-1,...rows.slice(1).sort((x,y)=>x[0]<y[0]?-1:1));
-    descargar("pagos-"+today()+".csv",csv(rows),"text/csv;charset=utf-8",true);return;
-  }
-  if(a==="exp-json"){descargar("respaldo-cobros-"+today()+".json",JSON.stringify({fecha:today(),prestamos:L}),"application/json",false);return}
+  if(a==="exp-prest"){bajarXlsx("prestamos-"+today()+".xlsx",[hojaPrest(),hojaResumen()]);return}
+  if(a==="exp-pagos"){bajarXlsx("pagos-"+today()+".xlsx",[hojaPagos()]);return}
+  if(a==="exp-todo"){bajarXlsx("respaldo-cobros-"+today()+".xlsx",[hojaResumen(),hojaPrest(),hojaCuotas(),hojaPagos(),hojaGastos()]);return}
+  if(a==="exp-json"){descargar("copia-tecnica-"+today()+".json",JSON.stringify({fecha:today(),prestamos:L}),"application/json",false);return}
   if(a==="invite"){const code=newId();try{await setDoc(doc(db,"invitaciones",code),{creado:Date.now(),usado:false});invLink=location.origin+location.pathname+"?r="+code}catch(x){err="No se pudo crear la invitación ("+(x.code||"error")+"). ¿Ya actualizaste las reglas de Firestore?"}return view()}
   if(a==="copy-inv"){try{await navigator.clipboard.writeText(invLink);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(a==="dias"){const k=document.getElementById("f_k");k.value=b.dataset.d;k.dispatchEvent(new Event("input",{bubbles:true}));return}
