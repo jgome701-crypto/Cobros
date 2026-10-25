@@ -1,0 +1,23 @@
+name: Avisos de cobro
+on:
+  schedule:
+    - cron: "0 12 * * *"   # 7:00 a. m. en Colombia
+  workflow_dispatch:
+    inputs:
+      prueba:
+        description: "Mandar una notificación de prueba a todos los celulares registrados"
+        type: boolean
+        default: false
+jobs:
+  avisos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install firebase-admin@12 --no-save
+      - run: node avisos.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PRUEBA: ${{ inputs.prueba }}
