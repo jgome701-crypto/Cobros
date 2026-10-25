@@ -62,6 +62,22 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
 .tl{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;min-width:0}
 .tl span{display:block;font-size:12px;color:var(--mut)}.tl b{display:block;font-size:20px;margin-top:4px;overflow-wrap:anywhere}.tl small{display:block;font-size:12px;color:var(--mut);margin-top:2px}
+.pag.cl>summary{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--fg);display:flex;justify-content:space-between;align-items:center}
+.pag.cl>summary b{font-size:17px;font-weight:500}
+.pag.cl>summary .more{margin:0}
+.pag.cl[open]>summary{border-color:var(--ac);margin-bottom:6px}
+.bw{margin:8px 0}.bl{display:flex;justify-content:space-between;gap:8px;font-size:14px}.bl small{color:var(--mut)}
+.bt{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin-top:4px}.bt i{display:block;height:100%;background:var(--ac)}
+.rk{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd);font-size:14px}
+.chc{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}
+.cht{text-align:center;font-weight:700;font-size:20px;margin:0 0 4px}
+.pie{display:flex;align-items:center;justify-content:center;gap:18px;margin:6px 0}.pie svg{width:150px;height:150px;flex:none}
+.lg{display:flex;align-items:center;gap:8px;font-size:14px;margin:5px 0}.lg i{width:11px;height:11px;display:inline-block;flex:none}
+.tb{width:100%;max-width:320px;border-collapse:collapse;font-size:14px;margin:12px auto 0}
+.tb th{background:#1f3864;color:#fff;padding:5px 10px;text-align:center;border:1px solid #fff}
+.tb td{background:#dce6f1;color:#111;padding:4px 10px;text-align:center;border:1px solid #fff}
+.tb tr:nth-child(odd) td{background:#fff}
+.tb.v th{background:#4f6228}.tb.v td,.tb.v tr:nth-child(odd) td{background:#ebf1de}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
@@ -112,7 +128,7 @@ let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=
   RAW={},P={},privOK=null,unsub2=null,migPriv=false,lockErr="",hiddenAt=0;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(x){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(x){}},del:k=>{try{localStorage.removeItem(k)}catch(x){}}};
 let pinHash=ls.get("cobros_pin")||"",locked=!!pinHash;
-let nav="inicio",filt="todos",showNotif=false,ntab="rec",hide=ls.get("cobros_hide")==="1";
+let nav="inicio",filt="todos",showNotif=false,ntab="rec",stBar="cob",stPie="est",hide=ls.get("cobros_hide")==="1";
 addEventListener("perfil",()=>{if(owner&&!cur&&!form&&!showNotif)view()});
 const sha=async t=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros:"+t))),b=>b.toString(16).padStart(2,"0")).join("");
 const Fc=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}):"";
@@ -389,21 +405,57 @@ function clientesLista(){
   const qq=norm2(busca),arr=Object.values(g).filter(x=>!qq||norm2(x.name).includes(qq)).sort((a,b)=>a.name.localeCompare(b.name));
   if(!arr.length)return '<div class="empty">Nadie coincide.</div>';
   return arr.map(x=>{
-    return '<details class="pag"><summary><b>'+esc(x.name)+'</b><span class="more"></span></summary>'+x.ids.map(id=>filaHtml(infoLista(id))).join("")+"</details>"}).join("");
+    return '<details class="pag cl"><summary><b>'+esc(x.name)+'</b><span class="more"></span></summary>'+x.ids.map(id=>filaHtml(infoLista(id))).join("")+"</details>"}).join("");
 }
 function clientesHtml(){return '<h2>Clientes</h2><input id="q_busca" type="search" placeholder="Buscar por nombre…" value="'+esc(busca)+'"><div id="lista">'+clientesLista()+"</div>"}
-function reportesHtml(ids){
-  const calle=ids.reduce((t,id)=>t+Math.max(0,calc(L[id]).bal),0),atr=ids.reduce((t,id)=>{const c=calc(L[id]);return t+(c.bal>0?Math.min(c.late,c.bal):0)},0),mes={};
-  ids.forEach(id=>{const l=L[id],c=calc(l),tot=(+l.principal||0)+c.int,r=tot>0?c.int/tot:0;l.pagos.forEach(p=>{const k=(p.d||"").slice(0,7);mes[k]=(mes[k]||0)+p.amt*r})});
-  const ks=Object.keys(mes).sort().slice(-6).reverse();
-  return '<h2>Reportes</h2><section class="cards"><div><span>Plata en la calle</span><b>'+M(calle)+'</b></div><div><span>Atrasado</span><b class="late">'+(calle>0?Math.round(atr/calle*100):0)+'%</b><span>'+M(atr)+'</span></div></section><h2>Ganancia cobrada por mes</h2><section class="cards" style="display:block">'+(ks.length?ks.map(k=>'<div class="sr"><span>'+esc(new Date(k+"-01T00:00").toLocaleDateString("es-CO",{month:"long",year:"numeric"}))+"</span><span>"+M(mes[k])+"</span></div>").join(""):'<div class="empty">Aún no hay pagos.</div>')+"</section>";
+const nice=mx=>{if(!(mx>0))return{max:1,step:.2};const e=Math.pow(10,Math.floor(Math.log10(mx/5))),f=mx/5/e,s=(f<=1?1:f<=2?2:f<=5?5:10)*e;return{max:Math.ceil(mx/s-1e-9)*s,step:s}};
+const axF=v=>v>=1e6?(+(v/1e6).toFixed(1)).toLocaleString("es-CO")+" M":v>=1e3?Math.round(v/1e3).toLocaleString("es-CO")+" mil":String(v);
+function barSvg(lab,vals){
+  const W=360,H=210,l=50,r=8,t=10,b=26,pw=W-l-r,ph=H-t-b,n=nice(Math.max(0,...vals));let h="";
+  const N=Math.round(n.max/n.step);
+  for(let i=0;i<=N;i++){const y=t+ph-i/N*ph;h+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--bd)"/><text x="'+(l-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" style="fill:var(--mut)">'+(hide?"":axF(i*n.step))+"</text>"}
+  const bw=pw/vals.length;
+  vals.forEach((v,i)=>{const bh=v/n.max*ph,x=l+i*bw+bw*.25;h+='<rect x="'+x.toFixed(1)+'" y="'+(t+ph-bh).toFixed(1)+'" width="'+(bw*.5).toFixed(1)+'" height="'+bh.toFixed(1)+'" fill="#4f81bd"/><text x="'+(l+i*bw+bw/2).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11" style="fill:var(--mut)">'+esc(lab[i])+"</text>"});
+  return '<svg viewBox="0 0 '+W+" "+H+'" style="width:100%;height:auto;display:block" role="img" aria-label="Gráfico de barras">'+h+"</svg>";
+}
+function pieSvg(d){
+  const t=d.reduce((s,x)=>s+x.v,0),nz=d.filter(x=>x.v>0);let a=-Math.PI/2,h="";
+  if(!(t>0))return"";
+  if(nz.length===1)h='<circle cx="90" cy="90" r="82" fill="'+nz[0].c+'"/>';
+  else{const w=nz.map(x=>Math.max(x.v/t,.04)),ws=w.reduce((q,y)=>q+y,0);nz.forEach((x,i)=>{const b=a+w[i]/ws*2*Math.PI;h+='<path d="M90 90L'+(90+82*Math.cos(a)).toFixed(2)+" "+(90+82*Math.sin(a)).toFixed(2)+"A82 82 0 "+(b-a>Math.PI?1:0)+" 1 "+(90+82*Math.cos(b)).toFixed(2)+" "+(90+82*Math.sin(b)).toFixed(2)+'Z" fill="'+x.c+'" style="stroke:var(--card);stroke-width:1.5"/>';a=b})}
+  return '<svg viewBox="0 0 180 180" role="img" aria-label="Gráfico circular">'+h+"</svg>";
+}
+function statsHtml(ids){
+  const m=n=>hide?"••••••":M(n);
+  const calle=ids.reduce((t,id)=>t+Math.max(0,calc(L[id]).bal),0),atr=ids.reduce((t,id)=>{const c=calc(L[id]);return t+(c.bal>0?Math.min(c.late,c.bal):0)},0);
+  const tb=(act,k,cu,l)=>'<button class="'+(cu===k?"":"ghost")+'" data-act="'+act+'" data-k="'+k+'">'+l+"</button>";
+  // ---- barras: últimos 6 meses ----
+  const t0=new Date(),ks=[];for(let i=5;i>=0;i--){const d=new Date(t0.getFullYear(),t0.getMonth()-i,1);ks.push(d.getFullYear()+"-"+pad(d.getMonth()+1))}
+  const S={};ks.forEach(k=>S[k]={cob:0,gan:0,pre:0});
+  ids.forEach(id=>{const l=L[id],c=calc(l),tot=(+l.principal||0)+c.int,r=tot>0?c.int/tot:0;
+    l.pagos.forEach(p=>{const x=S[(p.d||"").slice(0,7)];if(x){x.cob+=p.amt;x.gan+=p.amt*r}});
+    const y=S[(l.start||"").slice(0,7)];if(y)y.pre+=+l.principal||0});
+  const BT={cob:["Cobrado por mes","Cobrado"],gan:["Ganancia por mes","Ganancia"],pre:["Prestado por mes","Prestado"]},bk=BT[stBar]?stBar:"cob",bt=BT[bk];
+  const dk=ks.map(k=>new Date(k+"-01T00:00")),labs=dk.map(d=>d.toLocaleDateString("es-CO",{month:"short"}).replace(".","")+" "+String(d.getFullYear()).slice(2));
+  const vals=ks.map(k=>S[k][bk]);
+  const barras='<div class="chc"><div class="cht">'+bt[0]+'</div><div class="tabs">'+tb("stbar","cob",bk,"Cobrado")+tb("stbar","gan",bk,"Ganancia")+tb("stbar","pre",bk,"Prestado")+"</div>"+barSvg(labs,vals)
+    +'<table class="tb"><tr><th>Mes</th><th>'+bt[1]+"</th></tr>"+dk.map((d,i)=>'<tr><td style="text-transform:capitalize">'+esc(d.toLocaleDateString("es-CO",{month:"long",year:"numeric"}))+"</td><td>"+m(vals[i])+"</td></tr>").join("")+"</table></div>";
+  // ---- circular ----
+  const din=stPie==="din",inf=ids.map(infoLista);let pd;
+  if(din){let co=0,pc=0,at=0;ids.forEach(id=>{const c=calc(L[id]),b=Math.max(0,c.bal),a=b>0?Math.min(c.late,b):0;co+=c.paid;at+=a;pc+=b-a});pd=[{n:"Cobrado",v:co,c:"#9bbb59"},{n:"Por cobrar",v:pc,c:"#4f81bd"},{n:"Atrasado",v:at,c:"#c0504d"}]}
+  else pd=[{n:"Al día",v:inf.filter(x=>x.c.bal>0&&!x.d.late).length,c:"#4f81bd"},{n:"Atrasados",v:inf.filter(x=>x.d.late).length,c:"#c0504d"},{n:"Pagados",v:inf.filter(x=>x.c.bal<=0).length,c:"#9bbb59"}];
+  const tot=pd.reduce((s,x)=>s+x.v,0);
+  const circ='<div class="chc"><div class="cht">'+(din?"Dinero":"Préstamos")+'</div><div class="tabs">'+tb("stpie","est",din?"din":"est","Préstamos")+tb("stpie","din",din?"din":"est","Dinero")+"</div>"
+    +(tot>0?'<div class="pie">'+pieSvg(pd)+"<div>"+pd.map(x=>'<div class="lg"><i style="background:'+x.c+'"></i>'+x.n+"</div>").join("")+"</div></div>":'<div class="empty">Aún no hay datos.</div>')
+    +'<table class="tb v"><tr><th>'+(din?"Concepto":"Estado")+"</th><th>"+(din?"Valor":"Préstamos")+"</th></tr>"+pd.map(x=>"<tr><td>"+x.n+"</td><td>"+(din?m(x.v):x.v)+"</td></tr>").join("")+"</table></div>";
+  return '<h2>Estadísticas</h2><section class="cards"><div><span>Plata en la calle</span><b>'+m(calle)+'</b></div><div><span>Atrasado</span><b class="late">'+(calle>0?Math.round(atr/calle*100):0)+"%</b><span>"+m(atr)+"</span></div></section>"+barras+circ;
 }
 function view(){
   if(owner&&locked&&pinHash)return $.innerHTML=lockHtml();
   if(owner&&!cur){
     const ids=Object.keys(L);
     let h=topHtml(nCount(ids))+reciboHtml();
-    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?reportesHtml(ids)+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
+    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?statsHtml(ids)+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
     return $.innerHTML=h+(err?'<div class="err">'+esc(err)+"</div>":"")+navHtml()+sheetHtml(ids);
   }
   const l=cur.loan,c=calc(l);let h="";
@@ -514,6 +566,8 @@ $.addEventListener("click",async e=>{
   if(a==="notif"){showNotif=true;return view()}
   if(a==="close-sheet"){showNotif=false;return view()}
   if(a==="ntab"){ntab=b.dataset.k;return view()}
+  if(a==="stbar"){stBar=b.dataset.k;showMas=true;return view()}
+  if(a==="stpie"){stPie=b.dataset.k;showMas=true;return view()}
   if(a==="filt"){filt=b.dataset.k;return view()}
   if(a==="eye"){e.preventDefault();hide=!hide;ls.set("cobros_hide",hide?"1":"0");return view()}
   if(a==="undo"){const id=b.dataset.id,l0=L[id];if(!l0||!confirm("¿Deshacer este pago?"))return;const l=structuredClone(l0);l.pagos.splice(+b.dataset.i,1);b.disabled=true;try{await persist(id,l);L[id]=l;RAW[id]=Object.assign({},RAW[id]||{},{pagos:l.pagos})}catch(x){err="No se pudo deshacer ("+(x.code||"error")+")."}return view()}
