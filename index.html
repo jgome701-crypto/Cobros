@@ -10,9 +10,9 @@
 @media (prefers-color-scheme:dark){:root{--bg:#15191a;--fg:#e8ece9;--mut:#9aa5a0;--card:#1e2426;--bd:#2d3638;--ac:#4fbf8f;--bad:#ff8a80}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-#root{max-width:560px;margin:0 auto;padding:16px}
-h1{margin:0;font-size:24px}h2{font-size:16px;margin:20px 0 8px}
-.sub{margin:2px 0 14px;color:var(--mut)}
+#root{max-width:560px;margin:0 auto;padding:12px 14px}
+h1{margin:0;font-size:22px}h2{font-size:15px;margin:14px 0 6px}
+.sub{margin:2px 0 8px;color:var(--mut);font-size:14px}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .cards>div,.cards>details{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 12px}
 .cards span{display:block;font-size:12px;color:var(--mut)}.cards b{font-size:17px}
@@ -26,12 +26,12 @@ summary b{font-size:20px}.more{color:var(--ac)!important;margin-top:4px}.more::a
 .thumbs{display:flex;gap:8px;flex-wrap:wrap}.th{position:relative}
 .thumbs img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--bd);cursor:pointer;display:block}
 .th button.x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border-radius:99px}
-.al{display:flex;align-items:center;gap:8px;margin-top:8px}.al>button{flex:1;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd)}.al .btn{white-space:nowrap}
+.al{display:flex;align-items:center;gap:6px;margin-top:6px}.al>.nm{flex:1;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd);padding:7px 12px;line-height:1.25}.al>button:not(.nm),.al>.btn{padding:8px 10px;font-size:14px;white-space:nowrap}
 .zoom{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
 .zoom img{max-width:100%;max-height:100%;border-radius:8px}.cards .big b{font-size:28px;color:var(--ac)}
 .prog{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin:10px 0 0}
 .prog i{display:block;height:100%;background:var(--ac)}
-.note{margin:12px 0;padding:10px 12px;border-radius:12px;background:var(--card);border:1px solid var(--bd)}
+.note{margin:8px 0;padding:8px 12px;border-radius:12px;background:var(--card);border:1px solid var(--bd)}
 .late{color:var(--bad);font-weight:600}.ok{color:var(--ac);font-weight:600}
 .bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 button,.btn{font:inherit;padding:9px 14px;border-radius:10px;border:0;background:var(--ac);color:#fff;cursor:pointer;text-decoration:none;display:inline-block}
@@ -45,14 +45,17 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .err{color:var(--bad);font-size:14px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}
 .row small,.empty{color:var(--mut)}
-.item{width:100%;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.item{width:100%;text-align:left;background:var(--card);color:var(--fg);border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;padding:7px 12px;line-height:1.25}
+.pag{margin-top:8px}.pag>summary{padding:8px 2px;color:var(--mut)}.pag>summary .more{display:inline;margin:0 0 0 6px}
+.cards .sr span span{display:inline;font-size:inherit}
+.mas button,.mas .btn{margin:0}.tabs{display:flex;gap:6px;margin:10px 0}.tabs button{flex:1;padding:7px 6px}
 .item small{display:block}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,doc,onSnapshot,setDoc,deleteDoc,query,where,getDoc,getDocs,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,setDoc,deleteDoc,query,where,getDoc,getDocs,writeBatch,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app=initializeApp({
   apiKey:"AIzaSyDP2T1g5CDbgGoqnt-QAQI7eL2mjjsDl98",
@@ -62,7 +65,8 @@ const app=initializeApp({
   messagingSenderId:"838028186853",
   appId:"1:838028186853:web:97ede76ee44e2d155eb00c"
 });
-const auth=getAuth(app),db=getFirestore(app);
+const auth=getAuth(app);
+let db;try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(x){db=getFirestore(app)}
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 
 const $=document.getElementById("root"),q=new URLSearchParams(location.search);
@@ -73,7 +77,7 @@ const pad=n=>String(n).padStart(2,"0");
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); // fecha local, no UTC
 const today=()=>iso(new Date());
 const ADMIN="pbcPzLpAIyc2vUcsllsANp0PCSW2";
-const norm=d=>{const l=Object.assign({name:"",cedula:"",tel:"",fotos:[],principal:0,rate:0,start:"",pagos:[],gastos:[]},d);
+const norm=d=>{const l=Object.assign({name:"",cedula:"",tel:"",mora:0,fotos:[],principal:0,rate:0,start:"",pagos:[],gastos:[]},d);
   if(!l.cuotas){l.cuotas=+l.weeks||0;if(l.weeks)l.dias=7} // préstamos viejos en semanas siguen funcionando
   l.dias=+l.dias||7;return l};
 const cadaTxt=d=>d==7?"cada semana":d==14?"cada 2 semanas":d==15?"cada quincena":d==30?"cada mes":"cada "+d+" días";
@@ -91,7 +95,18 @@ const shrink=async f=>{
   return out};
 const newId=()=>Array.from(crypto.getRandomValues(new Uint8Array(10)),b=>b.toString(16).padStart(2,"0")).join("");
 const msg=t=>'<p class="empty">'+t+'</p>';
-let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,showWk=false,mesOff=0,weekOff=0,showWeek=false,renewBal=0,deferredInstall=null,invLink="",rcode=q.get("r"),simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"7"};
+let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=[],zoom=-1,showSch=false,showSim=false,showWk=false,mesOff=0,weekOff=0,showWeek=false,renewBal=0,deferredInstall=null,invLink="",rcode=q.get("r"),simv={cap:"",monto:"",n:"",rate:"",cuotas:"1",dias:"7"},
+  tab="sem",busca="",showPag=false,showRes=false,showTabs=false,showMas=false,lastPay=null,pendingRec=null,
+  RAW={},P={},privOK=null,unsub2=null,migPriv=false,lockErr="",hiddenAt=0;
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(x){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(x){}},del:k=>{try{localStorage.removeItem(k)}catch(x){}}};
+let pinHash=ls.get("cobros_pin")||"",locked=!!pinHash;
+const sha=async t=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros:"+t))),b=>b.toString(16).padStart(2,"0")).join("");
+const Fc=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}):"";
+const norm2=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+const diasEntre=(a,b)=>Math.round((new Date(a+"T00:00")-new Date(b+"T00:00"))/864e5);
+const race=pr=>{pr.catch(()=>{});return Promise.race([pr,new Promise(r=>setTimeout(r,5000))])};
+const csv=rows=>rows.map(r=>r.map(x=>'"'+String(x==null?"":x).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+function descargar(nombre,texto,tipo,bom){const b=new Blob([(bom?"\ufeff":"")+texto],{type:tipo}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
 
 function calc(l){
   const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.cuotas||1,per=+l.dias||7,cuota=(p+int)/w;
@@ -108,7 +123,7 @@ function prevHtml(){return fotosTmp.map((f,i)=>'<div class="th"><img src="'+f+'"
 function prev(){const p=document.getElementById("f_prev");if(p)p.innerHTML=prevHtml()}
 function formHtml(){
   const l=cur.loan;let h='<div class="form">';
-  if(form==="setup")h+=(renewBal>0?'<div class="note">Ojo: esta persona aún debe '+M(renewBal)+' del préstamo anterior. El préstamo nuevo se maneja por separado.</div>':"")+inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+inp("f_tel","Celular / WhatsApp (opcional)","tel",l.tel||"",'inputmode="tel"')+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Cada cuántos días paga (7 = semanal)","number",l.dias||7)+'<div class="bar" style="margin:0"><button class="ghost" data-act="dias" data-d="7">Cada semana</button><button class="ghost" data-act="dias" data-d="15">Quincena</button><button class="ghost" data-act="dias" data-d="30">Cada mes</button></div>'+'<div id="f_sim">'+newSimHtml(+l.principal||0,+l.rate||0,+l.cuotas||0,+l.dias||7,l.start||today())+"</div>"+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+'</div><small id="f_msg" class="late"></small>';
+  if(form==="setup")h+=(renewBal>0?'<div class="note">Ojo: esta persona aún debe '+M(renewBal)+' del préstamo anterior. El préstamo nuevo se maneja por separado.</div>':"")+inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+inp("f_tel","Celular / WhatsApp (opcional)","tel",l.tel||"",'inputmode="tel"')+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Cada cuántos días paga (7 = semanal)","number",l.dias||7)+'<div class="bar" style="margin:0"><button class="ghost" data-act="dias" data-d="7">Cada semana</button><button class="ghost" data-act="dias" data-d="15">Quincena</button><button class="ghost" data-act="dias" data-d="30">Cada mes</button></div>'+inp("f_mora","Mora por semana de atraso, % (opcional)","number",l.mora||"",'inputmode="decimal" step="any"')+'<div id="f_sim">'+newSimHtml(+l.principal||0,+l.rate||0,+l.cuotas||0,+l.dias||7,l.start||today())+"</div>"+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+'</div><small id="f_msg" class="late"></small>';
   if(form==="pago")h+=inp("f_d","Fecha del pago","date",today())+inp("f_a","Monto pagado (COP)","number","",'inputmode="numeric"')+inp("f_t","Nota (opcional)","text","");
   if(form==="gasto")h+=inp("f_d","Fecha","date",today())+inp("f_t","Descripción del gasto","text","")+inp("f_a","Monto (COP)","number","",'inputmode="numeric"');
   if(err)h+='<div class="err">'+esc(err)+"</div>";
@@ -135,11 +150,12 @@ function dueInfo(l,c){
 function alertHtml(ids){
   const hoy=[],atr=[];
   ids.forEach(id=>{const l=L[id],c=calc(l);if(c.bal<=0)return;const d=dueInfo(l,c);if(d.late)atr.push({id,l,x:d.late});else if(d.hoy)hoy.push({id,l,x:d.hoy})});
-  const row=(i,sub,txt)=>'<div class="al"><button data-act="open" data-id="'+i.id+'">'+esc(i.l.name)+sub+'<br><b>'+M(i.x.amt)+'</b></button><a class="btn" target="_blank" rel="noopener" href="'+waLink(i.l,txt)+'">Recordar</a></div>';
+  atr.sort((p,q)=>q.x.dias-p.x.dias);
+  const row=(i,sub,txt)=>'<div class="al"><button class="nm" data-act="open" data-id="'+i.id+'">'+esc(i.l.name)+sub+'<br><b>'+M(i.x.amt)+'</b></button><button data-act="pagar" data-id="'+i.id+'" data-amt="'+Math.round(i.x.amt)+'">✓ Pagó</button><a class="btn ghost" target="_blank" rel="noopener" href="'+waLink(i.l,txt)+'">Recordar</a></div>';
   let h="";
-  if(atr.length)h+='<h2>Atrasados ('+atr.length+')</h2>'+atr.map(i=>row(i,'<small class="late">'+i.x.dias+(i.x.dias==1?" día":" días")+" de atraso</small>","Hola "+i.l.name+", tienes un pago atrasado de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
+  if(atr.length)h+='<h2>Atrasados ('+atr.length+')</h2>'+atr.map(i=>row(i,' <small class="late">· '+i.x.dias+(i.x.dias==1?" día":" días")+"</small>","Hola "+i.l.name+", tienes un pago atrasado de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
   if(hoy.length)h+='<h2>Hoy te toca cobrar ('+hoy.length+')</h2>'+hoy.map(i=>row(i,"","Hola "+i.l.name+", te recuerdo que hoy te toca pagar tu cuota de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
-  return h||'<div class="note ok">Hoy no tienes cobros ni atrasos ✔</div>';
+  return h||'<p class="sub ok" style="margin:8px 0">Hoy no tienes cobros ni atrasos ✔</p>';
 }
 function semStats(off,det){
   const t=new Date();t.setHours(0,0,0,0);t.setDate(t.getDate()-((t.getDay()+6)%7)+off*7);
@@ -151,22 +167,22 @@ function semStats(off,det){
     for(const x of l.pagos)if(x.d>=a&&x.d<=b)cob+=x.amt;
     for(let k=1;k<=(+l.cuotas||0);k++){
       const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+(+l.dias||7)*k);const di=iso(d);
-      if(di>=a&&di<=b){const cov=c.paid>=k*c.cuota-.5;esp+=c.cuota;gan+=c.cuota*r;if(!cov)pend+=c.cuota;if(det)items.push({name:l.name,amt:c.cuota,d:di,cov,late:!cov&&di<today()})}
+      if(di>=a&&di<=b){const cov=c.paid>=k*c.cuota-.5;esp+=c.cuota;gan+=c.cuota*r;if(!cov)pend+=c.cuota;if(det)items.push({id,name:l.name,amt:c.cuota,rem:Math.max(0,Math.min(c.cuota,k*c.cuota-c.paid)),d:di,cov,late:!cov&&di<today()})}
     }
   }
   const f=d=>d.toLocaleDateString("es-CO",{day:"numeric",month:"short"});
   items.sort((p,q)=>p.d<q.d?-1:1);
   return{label:f(t)+" – "+f(e),esp,gan,cob,pend,items};
 }
-function semHtml(){
+function semBody(){
   const w=semStats(weekOff,true),tit=weekOff===0?"Esta semana":weekOff===1?"Próxima semana":weekOff===-1?"Semana pasada":"Semana";
-  const nav='<div class="bar" style="justify-content:space-between;align-items:center"><button class="ghost" data-act="sem" data-d="-1" aria-label="Semana anterior">◀</button><span style="text-align:center"><b>'+tit+'</b><br><small>'+esc(w.label)+'</small></span><button class="ghost" data-act="sem" data-d="1" aria-label="Semana siguiente">▶</button></div>';
+  const nav='<div class="bar" style="justify-content:space-between;align-items:center;margin:4px 0"><button class="ghost" data-act="sem" data-d="-1" aria-label="Semana anterior">◀</button><span style="text-align:center"><b>'+tit+'</b><br><small>'+esc(w.label)+'</small></span><button class="ghost" data-act="sem" data-d="1" aria-label="Semana siguiente">▶</button></div>';
   const st=i=>i.cov?'<span class="ok">Pagada</span>':i.late?'<span class="late">Atrasada</span>':"Pendiente";
   let prox="";for(let o=0;o<6;o++){const x=semStats(o);prox+='<div class="sr"><span>'+(o===0?"Esta semana":o===1?"Próxima":esc(x.label))+'<br><small>'+(o<2?esc(x.label):"")+'</small></span><span>'+M(x.esp)+'<br><small>ganancia '+M(x.gan)+"</small></span></div>"}
-  return '<section class="cards plan"><details class="big" id="sw"'+(showWeek?" open":"")+'><summary><b style="font-size:16px">Cobro de la semana</b><span class="more">Total a cobrar y ganancia semanal</span></summary><div class="sch">'+nav
+  return nav
    +'<section class="cards"><div><span>Por cobrar</span><b>'+M(w.esp)+'</b></div><div><span>Ganancia de la semana</span><b>'+M(w.gan)+'</b></div><div><span>Ya cobrado</span><b>'+M(w.cob)+'</b></div><div><span>Falta cobrar</span><b>'+M(w.pend)+'</b></div></section>'
-   +(w.items.length?'<h2>Quién paga</h2>'+w.items.map(i=>'<div class="sr"><span>'+esc(new Date(i.d+"T00:00").toLocaleDateString("es-CO",{weekday:"short",day:"numeric"}))+" · "+esc(i.name)+"</span><span>"+M(i.amt)+" · "+st(i)+"</span></div>").join(""):'<div class="empty">No hay cuotas que venzan esta semana.</div>')
-   +'<h2>Próximas semanas</h2>'+prox+"</div></details></section>";
+   +(w.items.length?'<h2>Quién paga</h2><section class="cards" style="display:block">'+w.items.map(i=>'<div class="sr"><span>'+esc(new Date(i.d+"T00:00").toLocaleDateString("es-CO",{weekday:"short",day:"numeric"}))+" · "+esc(i.name)+"</span><span>"+M(i.amt)+" · "+st(i)+(!i.cov&&i.rem>0?' <button class="ghost" style="padding:2px 8px" data-act="pagar" data-id="'+i.id+'" data-amt="'+Math.round(i.rem)+'">✓</button>':"")+"</span></div>").join("")+"</section>":'<div class="empty">No hay cuotas que venzan esta semana.</div>')
+   +'<h2>Próximas semanas</h2><section class="cards" style="display:block">'+prox+"</section>";
 }
 function mesDetalle(off){
   const t=new Date();t.setDate(1);t.setMonth(t.getMonth()+off);
@@ -193,14 +209,12 @@ function mesDetalle(off){
   });
   return{nombre:largo+" "+Y,weeks,cob,ganCob,esp,ganEsp};
 }
-function mesHtml(){
+function mesBody(){
   const m=mesDetalle(mesOff);
-  const nav='<div class="bar" style="justify-content:space-between;align-items:center"><button class="ghost" data-act="mes" data-d="-1" aria-label="Mes anterior">◀</button><b style="text-transform:capitalize">'+esc(m.nombre)+'</b><button class="ghost" data-act="mes" data-d="1" aria-label="Mes siguiente">▶</button></div>';
+  const nav='<div class="bar" style="justify-content:space-between;align-items:center;margin:4px 0"><button class="ghost" data-act="mes" data-d="-1" aria-label="Mes anterior">◀</button><b style="text-transform:capitalize">'+esc(m.nombre)+'</b><button class="ghost" data-act="mes" data-d="1" aria-label="Mes siguiente">▶</button></div>';
   const st=i=>i.cov?'<span class="ok">Pagada</span>':i.late?'<span class="late">Atrasada</span>':"Pendiente";
-  return '<section class="cards plan"><details class="big" id="wk"'+(showWk?" open":"")+'><summary><b style="font-size:16px">Pagos por semana</b><span class="more">Cuotas y cobros de '+esc(m.nombre)+'</span></summary><div class="sch">'+nav
-   +'<p class="sub">Por cobrar del mes: '+M(m.esp)+' (ganancia '+M(m.ganEsp)+') · Cobrado: '+M(m.cob)+' (ganancia '+M(m.ganCob)+')</p>'
-   +(m.weeks.length?m.weeks.map(w=>'<h2>'+w.label+'</h2><p class="sub">Por cobrar '+M(w.esp)+' · Cobrado '+M(w.cob)+'</p>'+w.items.map(i=>'<div class="sr"><span>'+i.day+" · "+esc(i.name)+"</span><span>"+M(i.amt)+" · "+st(i)+"</span></div>").join("")).join(""):'<div class="empty">No hay cuotas ni pagos en este mes.</div>')
-   +"</div></details></section>";
+  return nav+'<p class="sub">Por cobrar del mes: '+M(m.esp)+' (ganancia '+M(m.ganEsp)+') · Cobrado: '+M(m.cob)+' (ganancia '+M(m.ganCob)+')</p>'
+   +(m.weeks.length?m.weeks.map(w=>'<h2>'+w.label+'</h2><p class="sub">Por cobrar '+M(w.esp)+' · Cobrado '+M(w.cob)+'</p><section class="cards" style="display:block">'+w.items.map(i=>'<div class="sr"><span>'+i.day+" · "+esc(i.name)+"</span><span>"+M(i.amt)+" · "+st(i)+"</span></div>").join("")+"</section>").join(""):'<div class="empty">No hay cuotas ni pagos en este mes.</div>');
 }
 function simCalc(v){
   const m=+v.monto||0,r=+v.rate||0,q=+v.cuotas||0,d=+v.dias||0,cap=+v.cap||0;
@@ -215,39 +229,107 @@ function simHtml(){
    +'<h2>En total · '+s.n+(s.n==1?" persona":" personas")+'</h2><section class="cards"><div><span>Prestas</span><b>'+M(s.tot)+'</b></div><div><span>Recibes</span><b>'+M(s.recibir)+'</b></div><div><span>Ganancia total</span><b>'+M(s.ganT)+'</b></div><div><span>Ganancia por mes</span><b>'+M(s.ganM)+'</b></div></section>'
    +(s.over>0?'<div class="err">Te pasas de tu capital por '+M(s.over)+".</div>":"");
 }
-function simBox(){
-  return '<section class="cards plan"><details class="big" id="sim"'+(showSim?" open":"")+'><summary><b style="font-size:16px">Simulador de varias personas</b><span class="more">Ej.: 10 personas de $80.000 a 4 cuotas</span></summary><div class="sch">'
-   +inp("s_cap","Capital disponible (opcional)","number",simv.cap,'inputmode="decimal" step="any"')
+function simBody(){
+  return inp("s_cap","Capital disponible (opcional)","number",simv.cap,'inputmode="decimal" step="any"')
    +inp("s_monto","Monto por persona","number",simv.monto,'inputmode="decimal" step="any"')
    +inp("s_n","Número de personas (vacío = las que alcance el capital)","number",simv.n,'inputmode="numeric"')
    +inp("s_rate","Interés total del préstamo (%)","number",simv.rate,'inputmode="decimal" step="any"')
    +inp("s_cuotas","Número de cuotas","number",simv.cuotas,'inputmode="numeric"')
    +inp("s_dias","Días entre cuotas","number",simv.dias,'inputmode="numeric"')
-   +'<div id="sim_out">'+simHtml()+"</div></div></details></section>";
+   +'<div id="sim_out">'+simHtml()+"</div>";
+}
+function panelHtml(){
+  const tb=(t,l)=>'<button class="'+(tab===t?"":"ghost")+'" data-act="tab" data-t="'+t+'">'+l+"</button>";
+  return '<section class="cards plan"><details class="big" id="pn"'+(showTabs?" open":"")+'><summary><b style="font-size:16px">Cobros y simulador</b><span class="more">Semana, mes y simulador</span></summary><div class="sch"><div class="tabs">'+tb("sem","Semana")+tb("mes","Mes")+tb("sim","Simulador")+"</div>"+(tab==="mes"?mesBody():tab==="sim"?simBody():semBody())+"</div></details></section>";
+}
+function resumenHtml(ids){
+  const tot=ids.reduce((x,id)=>x+Math.max(0,calc(L[id]).bal),0),prest=ids.reduce((x,id)=>x+(+L[id].principal||0),0),gi=ids.reduce((x,id)=>x+calc(L[id]).int,0),cob=ids.reduce((x,id)=>x+calc(L[id]).paid,0),act=ids.filter(id=>calc(L[id]).bal>0).length;
+  return '<section class="cards plan" style="margin-top:0"><details class="big" id="rs"'+(showRes?" open":"")+'><summary><span>Por cobrar en total</span><b>'+M(tot)+'</b><span class="more">Ver resumen</span></summary><div class="sch"><section class="cards" style="margin-top:10px"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b></div><div><span>Ya cobrado</span><b>'+M(cob)+'</b></div><div><span>Préstamos activos</span><b>'+act+'</b></div></section></div></details></section>';
+}
+function infoLista(id){const l=L[id],c=calc(l);return{id,l,c,d:c.bal>0?dueInfo(l,c):{late:null,hoy:null}}}
+function filaHtml(x){
+  const {id,l,c,d}=x;let sub="";
+  if(c.bal<=0)sub='<small class="ok">Pagado ✔</small>';
+  else if(d.late)sub='<small class="late">Atrasado '+M(d.late.amt)+" · "+d.late.dias+" d</small>";
+  else if(d.hoy)sub='<small class="ok">Cobra hoy · '+M(d.hoy.amt)+"</small>";
+  else if(c.next)sub="<small>Próximo cobro: "+Fc(c.next)+"</small>";
+  return '<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+sub+"</span><b>"+M(c.bal)+"</b></button>";
+}
+function listaHtml(){
+  const qq=norm2(busca);
+  const arr=Object.keys(L).map(infoLista).filter(x=>!qq||norm2(x.l.name).includes(qq)||String(x.l.tel||"").includes(qq));
+  const rk=x=>x.d.late?0:x.d.hoy?1:2;
+  const act=arr.filter(x=>x.c.bal>0).sort((a,b)=>rk(a)-rk(b)||(rk(a)===0?b.d.late.dias-a.d.late.dias:((a.c.next||"9999")<(b.c.next||"9999")?-1:1)));
+  const pag=arr.filter(x=>x.c.bal<=0).sort((a,b)=>a.l.name.localeCompare(b.l.name));
+  let h="<h2>Por cobrar ("+act.length+")</h2>"+(act.length?act.map(filaHtml).join(""):'<div class="empty">'+(qq?"Nadie coincide con la búsqueda.":"No hay préstamos pendientes.")+"</div>");
+  if(pag.length)h+='<details class="pag" id="pag"'+(showPag||qq?" open":"")+"><summary>Pagados ("+pag.length+')<span class="more"></span></summary>'+pag.map(filaHtml).join("")+"</details>";
+  return h;
+}
+function reciboHtml(){
+  if(!lastPay||!L[lastPay.id])return"";
+  const l=L[lastPay.id],c=calc(l);
+  const txt="✅ Pago recibido\nHola "+l.name+", recibí tu pago de "+M(lastPay.amt)+" el "+F(lastPay.d)+".\nSaldo pendiente: "+M(Math.max(0,c.bal))+(c.next&&c.bal>0?"\nPróximo cobro: "+F(c.next):"")+"\nPuedes ver tu préstamo aquí: "+clientLink(lastPay.id);
+  return '<div class="note"><b>Pago registrado</b> · '+esc(l.name)+" "+M(lastPay.amt)+'<div class="bar" style="margin:8px 0 0"><a class="btn" target="_blank" rel="noopener" href="'+waLink(l,txt)+'">Enviar comprobante</a><button class="ghost" data-act="close-rec">Cerrar</button></div></div>';
+}
+function masHtml(){
+  return '<details class="pag mas" id="ms"'+(showMas?" open":"")+'><summary>Más opciones<span class="more"></span></summary><div class="bar"><button class="ghost" data-act="exp-prest">Descargar préstamos (Excel)</button><button class="ghost" data-act="exp-pagos">Descargar pagos (Excel)</button><button class="ghost" data-act="exp-json">Respaldo completo</button></div>'
+   +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+"</div>"+invBox()+"</details>";
+}
+function lockHtml(){
+  return '<h1>Bloqueado</h1><p class="sub">Escribe tu PIN para entrar.</p><div class="form"><label>PIN<input id="f_pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>'+(lockErr?'<div class="err">'+esc(lockErr)+"</div>":"")+'<button data-act="unlock">Entrar</button><button class="ghost" data-act="forgot-pin">Olvidé mi PIN</button></div>';
+}
+function cumpl(arr){
+  let ok=0,tarde=0,pend=0,sd=0;
+  for(const l of arr){
+    const c=calc(l),pg=[...l.pagos].sort((x,y)=>x.d<y.d?-1:1);let acc=0;const cum=pg.map(x=>(acc+=x.amt));
+    for(let k=1;k<=(+l.cuotas||0);k++){
+      const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+(+l.dias||7)*k);const due=iso(d);
+      const j=cum.findIndex(x=>x>=k*c.cuota-.5);
+      if(j>=0){if(pg[j].d<=due)ok++;else{tarde++;sd+=diasEntre(pg[j].d,due)}}else if(due<today())pend++;
+    }
+  }
+  return{ok,tarde,pend,prom:tarde?Math.round(sd/tarde):0};
+}
+function cumplHtml(l){
+  const k=norm2(l.name),arr=Object.keys(L).map(i=>L[i]).filter(x=>norm2(x.name)===k),s=cumpl(arr),tot=s.ok+s.tarde+s.pend;
+  if(!tot)return"";
+  const pct=Math.round(s.ok/tot*100),et=pct>=80?'<span class="ok">Muy cumplido</span>':pct>=50?"Regular":'<span class="late">Se atrasa mucho</span>';
+  return "<h2>Cumplimiento de "+esc(l.name)+'</h2><section class="cards"><div><span>Cuotas a tiempo</span><b>'+s.ok+'</b></div><div><span>Con atraso</span><b>'+s.tarde+"</b>"+(s.tarde?"<span>promedio "+s.prom+" días</span>":"")+'</div><div><span>Atrasadas sin pagar</span><b>'+s.pend+'</b></div><div><span>Calificación</span><b style="font-size:15px">'+et+"</b><span>"+arr.length+(arr.length==1?" préstamo":" préstamos")+"</span></div></section>";
+}
+function moraInfo(l,c){
+  const r=+l.mora||0;if(!(r>0))return null;
+  let m=0;sched(l,c).forEach(x=>{if(x.late){const un=Math.max(0,Math.min(c.cuota,x.k*c.cuota-c.paid));m+=un*r/100*Math.floor(diasEntre(today(),x.d)/7)}});
+  const ya=l.gastos.filter(g=>g.mora).reduce((t,g)=>t+g.amt,0);
+  return{r,pend:Math.max(0,Math.round(m-ya))};
+}
+function moraBox(l,c){
+  const m=moraInfo(l,c);if(!m||m.pend<=0)return"";
+  return '<div class="note"><b class="late">Mora acumulada: '+M(m.pend)+"</b> ("+esc(m.r)+'% por semana de atraso)<div class="bar" style="margin:8px 0 0"><button data-act="add-mora" data-amt="'+m.pend+'">Agregar al saldo</button></div></div>';
+}
+async function persist(id,loan){
+  if(!loan.uid)loan.uid=auth.currentUser.uid;
+  if(privOK===true){
+    const pub=Object.assign({},loan),ced=String(loan.cedula||"");delete pub.cedula;delete pub.fotos;pub.cedulaUlt=ced.slice(-3);
+    const bt=writeBatch(db);bt.set(doc(db,"prestamos",id),pub);bt.set(doc(db,"privados",id),{uid:loan.uid,cedula:ced,fotos:loan.fotos||[]});
+    await race(bt.commit());
+  }else await race(setDoc(doc(db,"prestamos",id),loan));
 }
 function view(){
+  if(owner&&locked&&pinHash)return $.innerHTML=lockHtml();
   if(owner&&!cur){
-    const ids=Object.keys(L).sort((a,b)=>L[a].name.localeCompare(L[b].name));
-    const tot=ids.reduce((s,id)=>s+Math.max(0,calc(L[id]).bal),0);
-    let h='<div class="bar" style="justify-content:space-between;margin-top:0"><h1>Mis préstamos</h1><button class="ghost" data-act="logout">Salir</button></div>';
-    h+='<p class="sub">'+(ids.length?"Por cobrar en total: <b>"+M(tot)+"</b>. Toca uno para verlo o editarlo.":"")+"</p>";
-    if(!ids.length)h+=msg("Aún no tienes préstamos.");
-    else{
-      const prest=ids.reduce((x,id)=>x+(+L[id].principal||0),0);
-      const act=ids.filter(id=>calc(L[id]).bal>0);
-      const gi=ids.reduce((x,id)=>x+calc(L[id]).int,0);
-      h+='<section class="cards"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b><span>suma de '+ids.length+(ids.length==1?" préstamo":" préstamos")+'</span></div></section>';
-    }
-    if(ids.length)h+=alertHtml(ids)+semHtml()+mesHtml();
-    h+=simBox();
-    ids.forEach(id=>{const l=L[id],c=calc(l);h+='<button class="item" data-act="open" data-id="'+id+'"><span>'+esc(l.name)+(c.bal>0&&c.late>0?'<small class="late">Atrasado: '+M(c.late)+"</small>":c.bal<=0?'<small class="ok">Pagado</small>':"")+"</span><b>"+M(c.bal)+"</b></button>"});
-    return $.innerHTML=h+'<div class="bar"><button data-act="new">+ Nuevo préstamo</button></div>'+invBox()+(err?'<div class="err">'+esc(err)+"</div>":"");
+    const ids=Object.keys(L);
+    let h='<div class="bar" style="justify-content:space-between;align-items:center;margin:0 0 8px"><h1>Mis préstamos</h1><span style="display:flex;gap:6px"><button data-act="new">＋ Nuevo</button><button class="ghost" data-act="logout">Salir</button></span></div>';
+    h+=reciboHtml();
+    if(!ids.length)h+=msg("Aún no tienes préstamos. Toca «＋ Nuevo» para crear el primero.")+panelHtml();
+    else h+=resumenHtml(ids)+alertHtml(ids)+panelHtml()+'<div style="margin:10px 0 0"><input id="q_busca" type="search" placeholder="Buscar por nombre…" value="'+esc(busca)+'"></div><div id="lista">'+listaHtml()+"</div>";
+    return $.innerHTML=h+masHtml()+(err?'<div class="err">'+esc(err)+"</div>":"");
   }
   const l=cur.loan,c=calc(l);let h="";
   if(owner)h+='<div class="bar"><button class="ghost" data-act="back">← Todos</button></div>';
   h+="<h1>"+esc(l.name||"Nuevo préstamo")+"</h1>";
+  if(owner&&lastPay&&lastPay.id===cur.id)h+=reciboHtml();
   if(l.name){
-    h+='<p class="sub">Préstamo del '+F(l.start)+(l.cedula?" · Cédula "+(owner?esc(l.cedula):"••••"+esc(String(l.cedula).slice(-3))):"")+"</p>";
+    h+='<p class="sub">Préstamo del '+F(l.start)+(owner?(l.cedula?" · Cédula "+esc(l.cedula):""):(l.cedula||l.cedulaUlt?" · Cédula ••••"+esc(l.cedulaUlt||String(l.cedula).slice(-3)):""))+"</p>";
     if(!owner&&c.bal>0){const d=dueInfo(l,c);if(d.late)h+='<div class="note late">⚠ Tienes un pago atrasado de '+M(d.late.amt)+" ("+d.late.dias+(d.late.dias==1?" día":" días")+").</div>";else if(d.hoy)h+='<div class="note">📅 Hoy te toca pagar tu cuota de <b>'+M(d.hoy.amt)+"</b>.</div>"}
     if(!owner&&deferredInstall)h+='<div class="bar"><button data-act="install">Instalar en mi celular</button></div>';
     h+='<section class="cards"><div class="big"><span>Saldo pendiente</span><b>'+M(c.bal)+'</b><div class="prog"><i style="width:'+c.pct+'%"></i></div></div><div><span>Prestado</span><b>'+M(l.principal)+"</b></div><div><span>Interés ("+esc(l.rate)+"%)</span><b>"+M(c.int)+"</b></div><div><span>Gastos</span><b>"+M(c.g)+"</b></div><div><span>Pagado ("+c.pct+"%)</span><b>"+M(c.paid)+"</b></div></section>";
@@ -265,6 +347,7 @@ function view(){
       h+='<div class="bar"><button class="ghost" data-act="copy">Copiar link</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent("Aquí puedes ver el estado de tu préstamo: "+link)+'">Enviar por WhatsApp</a></div>';
     }
     if(err&&!form)h+='<div class="err">'+esc(err)+"</div>";
+    if(l.name&&!form)h+=moraBox(l,c)+cumplHtml(l);
   }
   if(l.name&&l.fotos.length)h+='<h2>Fotos</h2><div class="thumbs">'+l.fotos.map((f,i)=>'<img src="'+f+'" data-act="zoom" data-i="'+i+'" alt="Foto '+(i+1)+'">').join("")+"</div>";
   if(l.name){
@@ -301,13 +384,25 @@ function invBox(){
 }
 async function save(loan){
   err="";
-  try{await setDoc(doc(db,"prestamos",cur.id),loan);cur.loan=loan;delete cur.draft;L[cur.id]=loan;form=null;renewBal=0}
+  try{await persist(cur.id,loan);cur.loan=loan;delete cur.draft;L[cur.id]=loan;form=null;renewBal=0}
   catch(e){err="No se pudo guardar ("+(e.code||"error")+"). Revisa tu conexión e intenta de nuevo."}
   view();
 }
+function rebuild(){
+  L={};for(const id of Object.keys(RAW)){const p=P[id];L[id]=norm(Object.assign({},RAW[id],p?{cedula:p.cedula||"",fotos:p.fotos||[]}:{}))}
+  if(cur&&!cur.draft){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
+  if(!form)view();
+  migrarPriv();
+}
+async function migrarPriv(){ // mueve cédula y fotos viejas a un documento privado (solo el dueño lo lee)
+  if(privOK!==true||migPriv)return;
+  const falt=Object.keys(RAW).filter(id=>(RAW[id].cedula||(RAW[id].fotos&&RAW[id].fotos.length))&&!P[id]);
+  if(!falt.length)return;migPriv=true;
+  try{for(let i=0;i<falt.length;i+=4){const bt=writeBatch(db);falt.slice(i,i+4).forEach(id=>{const r=RAW[id];bt.set(doc(db,"privados",id),{uid:r.uid||auth.currentUser.uid,cedula:r.cedula||"",fotos:r.fotos||[]});bt.update(doc(db,"prestamos",id),{cedula:deleteField(),fotos:deleteField(),cedulaUlt:String(r.cedula||"").slice(-3)})});await bt.commit()}}catch(x){}
+}
 $.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act,v=id=>document.getElementById(id).value;
-  if(a==="login"){b.disabled=true;try{await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"))}catch(x){askLogin("Correo o contraseña incorrectos.")}return}
+  if(a==="login"){b.disabled=true;try{await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"));locked=false}catch(x){askLogin("Correo o contraseña incorrectos.")}return}
   if(a==="register"){
     const em=v("f_e").trim(),p1=v("f_pw"),p2=v("f_pw2");
     if(!em||p1.length<6)return askRegister("Escribe tu correo y una contraseña de al menos 6 caracteres.");
@@ -331,6 +426,36 @@ $.addEventListener("click",async e=>{
   if(a==="unzoom"){zoom=-1;return view()}
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
+  if(a==="unlock"){const h=await sha(v("f_pin").trim());if(h===pinHash){locked=false;lockErr=""}else lockErr="PIN incorrecto.";return view()}
+  if(a==="forgot-pin"){if(confirm("Para entrar sin el PIN tienes que volver a iniciar sesión con tu contraseña. ¿Continuar?")){pinHash="";ls.del("cobros_pin");locked=false;lockErr="";signOut(auth)}return}
+  if(a==="set-pin"){const p1=prompt("Escribe un PIN de 4 a 8 números");if(p1===null)return;if(!/^\d{4,8}$/.test(p1.trim())){err="El PIN debe tener entre 4 y 8 números.";showMas=true;return view()}const p2=prompt("Repite el PIN");if(p2===null)return;if(p1.trim()!==p2.trim()){err="Los PIN no coinciden.";showMas=true;return view()}pinHash=await sha(p1.trim());ls.set("cobros_pin",pinHash);showMas=true;return view()}
+  if(a==="del-pin"){if(confirm("¿Quitar el PIN de bloqueo?")){pinHash="";locked=false;ls.del("cobros_pin");showMas=true;view()}return}
+  if(a==="close-rec"){lastPay=null;return view()}
+  if(a==="tab"){tab=b.dataset.t;return view()}
+  if(a==="pagar"){
+    const id=b.dataset.id,amt=Math.round(+b.dataset.amt||0),l0=L[id];if(!l0||!(amt>0))return;
+    if(!confirm("¿Registrar un pago de "+M(amt)+" de "+l0.name+" con fecha de hoy?"))return;
+    const l=structuredClone(l0);l.pagos.push({d:today(),amt,n:"Cuota"});l.pagos.sort((x,y)=>x.d<y.d?-1:1);
+    b.disabled=true;
+    try{await persist(id,l);L[id]=l;RAW[id]=Object.assign({},RAW[id]||{},{pagos:l.pagos});lastPay={id,amt,d:today()}}catch(x){err="No se pudo registrar el pago ("+(x.code||"error")+")."}
+    return view();
+  }
+  if(a==="add-mora"){
+    const amt=Math.round(+b.dataset.amt||0);if(!(amt>0))return;
+    const l=structuredClone(cur.loan);l.gastos.push({d:today(),amt,desc:"Mora",mora:true});b.disabled=true;return save(l);
+  }
+  if(a==="exp-prest"){
+    const rows=[["Nombre","Cédula","Celular","Fecha del préstamo","Prestado","Interés %","Interés $","Cuotas","Cada (días)","Valor cuota","Pagado","Gastos","Saldo","Próximo cobro","Estado"]];
+    Object.keys(L).forEach(id=>{const l=L[id],c=calc(l);rows.push([l.name,l.cedula,l.tel,l.start,l.principal,l.rate,Math.round(c.int),l.cuotas,l.dias,Math.round(c.cuota),c.paid,c.g,Math.round(c.bal),c.bal>0?c.next||"":"",c.bal<=0?"Pagado":c.late>0?"Atrasado":"Al día"])});
+    descargar("prestamos-"+today()+".csv",csv(rows),"text/csv;charset=utf-8",true);return;
+  }
+  if(a==="exp-pagos"){
+    const rows=[["Fecha","Persona","Monto","Nota"]];
+    Object.keys(L).forEach(id=>L[id].pagos.forEach(x=>rows.push([x.d,L[id].name,x.amt,x.n||""])));
+    rows.splice(1,rows.length-1,...rows.slice(1).sort((x,y)=>x[0]<y[0]?-1:1));
+    descargar("pagos-"+today()+".csv",csv(rows),"text/csv;charset=utf-8",true);return;
+  }
+  if(a==="exp-json"){descargar("respaldo-cobros-"+today()+".json",JSON.stringify({fecha:today(),prestamos:L}),"application/json",false);return}
   if(a==="invite"){const code=newId();try{await setDoc(doc(db,"invitaciones",code),{creado:Date.now(),usado:false});invLink=location.origin+location.pathname+"?r="+code}catch(x){err="No se pudo crear la invitación ("+(x.code||"error")+"). ¿Ya actualizaste las reglas de Firestore?"}return view()}
   if(a==="copy-inv"){try{await navigator.clipboard.writeText(invLink);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(a==="dias"){const k=document.getElementById("f_k");k.value=b.dataset.d;k.dispatchEvent(new Event("input",{bubbles:true}));return}
@@ -345,17 +470,17 @@ $.addEventListener("click",async e=>{
   if(a==="copy"){try{await navigator.clipboard.writeText(location.origin+location.pathname+"?c="+cur.id);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(["pago","gasto","setup"].includes(a)){form=a;if(a==="setup")fotosTmp=[...(cur.loan.fotos||[])];return view()}
   if(a==="ask-del"){askDel=true;return view()}
-  if(a==="del-loan"){try{await deleteDoc(doc(db,"prestamos",cur.id));delete L[cur.id];cur=null}catch(x){err="No se pudo eliminar ("+(x.code||"error")+")."}askDel=false;return view()}
+  if(a==="del-loan"){try{const bt=writeBatch(db);bt.delete(doc(db,"prestamos",cur.id));if(P[cur.id])bt.delete(doc(db,"privados",cur.id));await race(bt.commit());delete L[cur.id];delete RAW[cur.id];cur=null}catch(x){err="No se pudo eliminar ("+(x.code||"error")+")."}askDel=false;return view()}
   const l=structuredClone(cur.loan);
   if(a==="save-setup"){
     const n=v("f_n").trim(),p=+v("f_p"),r=+v("f_r"),w=+v("f_w"),k=+v("f_k"),d=v("f_d");
     if(!n||!(p>0)||!(w>0)||!(k>0)||!d||r<0){err="Completa nombre, monto, cuotas, días y fecha.";return view()}
-    Object.assign(l,{name:n,cedula:v("f_c").trim(),tel:v("f_tel").trim(),principal:p,rate:r,cuotas:w,dias:k,start:d,fotos:fotosTmp.slice()});
+    Object.assign(l,{name:n,cedula:v("f_c").trim(),tel:v("f_tel").trim(),mora:+v("f_mora")||0,principal:p,rate:r,cuotas:w,dias:k,start:d,fotos:fotosTmp.slice()});
     if(!l.uid)l.uid=auth.currentUser.uid;
     if(JSON.stringify(l).length>900000){err="Las fotos pesan demasiado. Quita alguna.";return view()}
   }else if(a==="save-pago"||a==="save-gasto"){
     const amt=+v("f_a");if(!(amt>0)){err="Escribe un monto válido.";return view()}
-    if(a==="save-pago")l.pagos.push({d:v("f_d"),amt,n:v("f_t").trim()});
+    if(a==="save-pago"){l.pagos.push({d:v("f_d"),amt,n:v("f_t").trim()});pendingRec={id:cur.id,amt,d:v("f_d")}}
     else{if(!v("f_t").trim()){err="Escribe una descripción.";return view()}l.gastos.push({d:v("f_d"),amt,desc:v("f_t").trim()})}
     l.pagos.sort((x,y)=>x.d<y.d?-1:1);l.gastos.sort((x,y)=>x.d<y.d?-1:1);
   }else if(a==="del-pago"||a==="del-gasto"){
@@ -363,6 +488,7 @@ $.addEventListener("click",async e=>{
     l[a==="del-pago"?"pagos":"gastos"].splice(+b.dataset.i,1);
   }else return;
   b.disabled=true;await save(l);
+  if(pendingRec){if(!err)lastPay=pendingRec;pendingRec=null;view()}
 });
 $.addEventListener("change",async e=>{
   if(e.target.id!=="f_f")return;
@@ -372,6 +498,7 @@ $.addEventListener("change",async e=>{
   if(m)m.textContent=full?"Máximo 4 fotos. Quita una (✕) para agregar otra.":bad?"No se pudo leer "+bad+" foto(s). Si la tomaste con la cámara, elígela desde la galería o toma la foto en formato JPG.":"";
 });
 $.addEventListener("input",e=>{
+  if(e.target.id==="q_busca"){busca=e.target.value;const o=document.getElementById("lista");if(o)o.innerHTML=listaHtml();return}
   if(["f_p","f_r","f_w","f_k","f_d"].includes(e.target.id)){
     const o=document.getElementById("f_sim"),g=id=>+(document.getElementById(id)||{}).value||0;
     if(o)o.innerHTML=newSimHtml(g("f_p"),g("f_r"),g("f_w"),g("f_k")||7,(document.getElementById("f_d")||{}).value||today());
@@ -380,11 +507,12 @@ $.addEventListener("input",e=>{
   const k={s_cap:"cap",s_monto:"monto",s_n:"n",s_rate:"rate",s_cuotas:"cuotas",s_dias:"dias"}[e.target.id];
   if(!k)return;simv[k]=e.target.value;const o=document.getElementById("sim_out");if(o)o.innerHTML=simHtml();
 });
-$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open;if(e.target.id==="wk")showWk=e.target.open;if(e.target.id==="sw")showWeek=e.target.open},true);
-$.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.target.id==="f_pw"||e.target.id==="f_pw2")){const bt=document.querySelector('[data-act="login"]')||document.querySelector('[data-act="register"]');if(bt)bt.click()}});
+$.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open;if(e.target.id==="wk")showWk=e.target.open;if(e.target.id==="sw")showWeek=e.target.open;if(e.target.id==="pn")showTabs=e.target.open;if(e.target.id==="rs")showRes=e.target.open;if(e.target.id==="pag")showPag=e.target.open;if(e.target.id==="ms")showMas=e.target.open},true);
+$.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.target.id==="f_pw"||e.target.id==="f_pw2"||e.target.id==="f_pin")){const bt=document.querySelector('[data-act="login"]')||document.querySelector('[data-act="register"]')||document.querySelector('[data-act="unlock"]');if(bt)bt.click()}});
 
 // ---- Arranque ----
 const c=q.get("c");
+document.addEventListener("visibilitychange",()=>{if(document.hidden)hiddenAt=Date.now();else if(pinHash&&owner&&hiddenAt&&Date.now()-hiddenAt>60000){locked=true;view()}});
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;if(!owner&&cur)view()});
 if(c){ // vista del cliente: solo lectura, sin sesión
   try{ // manifiesto propio: la app instalada se abre directo en el préstamo de este cliente
@@ -399,16 +527,15 @@ if(c){ // vista del cliente: solo lectura, sin sesión
 }else if(rcode){registerFlow()}else startOwner();
 function startOwner(){
   onAuthStateChanged(auth,u=>{
-    if(unsub){unsub();unsub=null}
-    if(!u){owner=false;L={};cur=null;form=null;return askLogin()}
+    if(unsub){unsub();unsub=null}if(unsub2){unsub2();unsub2=null}
+    if(!u){owner=false;L={};RAW={};P={};privOK=null;migPriv=false;cur=null;form=null;lastPay=null;locked=!!pinHash;return askLogin()}
     owner=true;
     if(u.uid===ADMIN)migrar();
+    unsub2=onSnapshot(query(collection(db,"privados"),where("uid","==",u.uid)),
+      s=>{P={};s.forEach(d=>P[d.id]=d.data());privOK=true;rebuild()},
+      ()=>{P={};privOK=false;rebuild()});
     unsub=onSnapshot(query(collection(db,"prestamos"),where("uid","==",u.uid)),
-      s=>{
-        L={};s.forEach(d=>L[d.id]=norm(d.data()));
-        if(cur&&!cur.draft){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
-        if(!form)view();
-      },
+      s=>{RAW={};s.forEach(d=>RAW[d.id]=d.data());rebuild()},
       e=>$.innerHTML=msg("No se pudo leer los datos ("+esc(e.code)+"). Revisa las reglas de Firestore."));
   });
 }
