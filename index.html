@@ -273,7 +273,7 @@ function reciboHtml(){
 }
 function masHtml(){
   return '<details class="pag mas" id="ms"'+(showMas?" open":"")+'><summary>Más opciones<span class="more"></span></summary><div class="bar"><button class="ghost" data-act="exp-prest">Descargar préstamos (Excel)</button><button class="ghost" data-act="exp-pagos">Descargar pagos (Excel)</button><button class="ghost" data-act="exp-json">Respaldo completo</button></div>'
-   +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+"</div>"+invBox()+"</details>";
+   +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+"</div>"+(avisosOK()?'<div class="bar">'+(ls.get("cobros_push_owner")?'<span class="ok">🔔 Avisos activados en este celular ✓</span>':'<button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button>')+"</div>":"")+invBox()+"</details>";
 }
 function lockHtml(){
   return '<h1>Bloqueado</h1><p class="sub">Escribe tu PIN para entrar.</p><div class="form"><label>PIN<input id="f_pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>'+(lockErr?'<div class="err">'+esc(lockErr)+"</div>":"")+'<button data-act="unlock">Entrar</button><button class="ghost" data-act="forgot-pin">Olvidé mi PIN</button></div>';
@@ -306,6 +306,25 @@ function moraBox(l,c){
   const m=moraInfo(l,c);if(!m||m.pend<=0)return"";
   return '<div class="note"><b class="late">Mora acumulada: '+M(m.pend)+"</b> ("+esc(m.r)+'% por semana de atraso)<div class="bar" style="margin:8px 0 0"><button data-act="add-mora" data-amt="'+m.pend+'">Agregar al saldo</button></div></div>';
 }
+const VAPID="BB-1fjEOu9uBd_Bzg2j4QtJr6vaI4Vd7fSbtLYAAQFKpr-yLpZDpOTuTPJ80g2atftb82Azs9w2xZ5-nli5FCFA";
+const avisosOK=()=>!!VAPID&&"Notification" in window&&"serviceWorker" in navigator;
+async function activarAvisos(tipo,loanId){ // pide permiso, obtiene el token del celular y lo guarda para que lleguen los avisos
+  try{
+    if(!avisosOK()){alert("Este navegador no permite avisos. En iPhone primero instala la app en la pantalla de inicio.");return false}
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){alert("No diste permiso para las notificaciones. Puedes activarlo en los ajustes del navegador.");return false}
+    const {getMessaging,getToken,isSupported}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js");
+    if(!(await isSupported())){alert("Este celular no permite avisos desde el navegador.");return false}
+    const reg=await navigator.serviceWorker.ready;
+    const token=await getToken(getMessaging(app),{vapidKey:VAPID,serviceWorkerRegistration:reg});
+    if(!token){alert("No se pudo activar el aviso. Intenta de nuevo.");return false}
+    const id=(await sha(token+(loanId||auth.currentUser.uid))).slice(0,40);
+    const data=tipo==="cliente"?{tipo:"cliente",loanId,token,creado:Date.now()}:{tipo:"prestamista",uid:auth.currentUser.uid,token,creado:Date.now()};
+    try{await setDoc(doc(db,"tokens",id),data)}catch(x){} // si ya estaba registrado no pasa nada
+    ls.set("cobros_push_"+(loanId||"owner"),"1");
+    return true;
+  }catch(x){alert("No se pudieron activar los avisos ("+(x.code||x.message||"error")+")");return false}
+}
 async function persist(id,loan){
   if(!loan.uid)loan.uid=auth.currentUser.uid;
   if(privOK===true){
@@ -332,6 +351,7 @@ function view(){
     h+='<p class="sub">Préstamo del '+F(l.start)+(owner?(l.cedula?" · Cédula "+esc(l.cedula):""):(l.cedula||l.cedulaUlt?" · Cédula ••••"+esc(l.cedulaUlt||String(l.cedula).slice(-3)):""))+"</p>";
     if(!owner&&c.bal>0){const d=dueInfo(l,c);if(d.late)h+='<div class="note late">⚠ Tienes un pago atrasado de '+M(d.late.amt)+" ("+d.late.dias+(d.late.dias==1?" día":" días")+").</div>";else if(d.hoy)h+='<div class="note">📅 Hoy te toca pagar tu cuota de <b>'+M(d.hoy.amt)+"</b>.</div>"}
     if(!owner&&deferredInstall)h+='<div class="bar"><button data-act="install">Instalar en mi celular</button></div>';
+    if(!owner&&avisosOK())h+=ls.get("cobros_push_"+cur.id)?'<p class="sub ok" style="margin:8px 0">🔔 Avisos de pago activados ✓</p>':'<div class="bar"><button class="ghost" data-act="push-cliente">🔔 Avisarme cuando me toque pagar</button></div>';
     h+='<section class="cards"><div class="big"><span>Saldo pendiente</span><b>'+M(c.bal)+'</b><div class="prog"><i style="width:'+c.pct+'%"></i></div></div><div><span>Prestado</span><b>'+M(l.principal)+"</b></div><div><span>Interés ("+esc(l.rate)+"%)</span><b>"+M(c.int)+"</b></div><div><span>Gastos</span><b>"+M(c.g)+"</b></div><div><span>Pagado ("+c.pct+"%)</span><b>"+M(c.paid)+"</b></div></section>";
     const cd=c.bal<=0?'<span class="ok">Pagado completo ✔</span>':c.late>0?'<span class="late">Atrasado: '+M(c.late)+"</span>":'<span class="ok">Al día</span>';
     const S=sched(l,c);
@@ -421,11 +441,13 @@ $.addEventListener("click",async e=>{
     }
     return;
   }
+  if(a==="push-cliente"){b.disabled=true;await activarAvisos("cliente",cur.id);return view()}
   if(a==="install"&&deferredInstall){deferredInstall.prompt();deferredInstall=null;return view()}
   if(a==="zoom"){zoom=+b.dataset.i;return view()}
   if(a==="unzoom"){zoom=-1;return view()}
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
+  if(a==="push-owner"){b.disabled=true;await activarAvisos("prestamista");showMas=true;return view()}
   if(a==="unlock"){const h=await sha(v("f_pin").trim());if(h===pinHash){locked=false;lockErr=""}else lockErr="PIN incorrecto.";return view()}
   if(a==="forgot-pin"){if(confirm("Para entrar sin el PIN tienes que volver a iniciar sesión con tu contraseña. ¿Continuar?")){pinHash="";ls.del("cobros_pin");locked=false;lockErr="";signOut(auth)}return}
   if(a==="set-pin"){const p1=prompt("Escribe un PIN de 4 a 8 números");if(p1===null)return;if(!/^\d{4,8}$/.test(p1.trim())){err="El PIN debe tener entre 4 y 8 números.";showMas=true;return view()}const p2=prompt("Repite el PIN");if(p2===null)return;if(p1.trim()!==p2.trim()){err="Los PIN no coinciden.";showMas=true;return view()}pinHash=await sha(p1.trim());ls.set("cobros_pin",pinHash);showMas=true;return view()}
