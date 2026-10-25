@@ -62,6 +62,13 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
 .tl{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;min-width:0}
 .tl span{display:block;font-size:12px;color:var(--mut)}.tl b{display:block;font-size:20px;margin-top:4px;overflow-wrap:anywhere}.tl small{display:block;font-size:12px;color:var(--mut);margin-top:2px}
+.pag.cl>summary{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--fg);display:flex;justify-content:space-between;align-items:center}
+.pag.cl>summary b{font-size:17px;font-weight:500}
+.pag.cl>summary .more{margin:0}
+.pag.cl[open]>summary{border-color:var(--ac);margin-bottom:6px}
+.bw{margin:8px 0}.bl{display:flex;justify-content:space-between;gap:8px;font-size:14px}.bl small{color:var(--mut)}
+.bt{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin-top:4px}.bt i{display:block;height:100%;background:var(--ac)}
+.rk{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd);font-size:14px}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
@@ -389,21 +396,44 @@ function clientesLista(){
   const qq=norm2(busca),arr=Object.values(g).filter(x=>!qq||norm2(x.name).includes(qq)).sort((a,b)=>a.name.localeCompare(b.name));
   if(!arr.length)return '<div class="empty">Nadie coincide.</div>';
   return arr.map(x=>{
-    return '<details class="pag"><summary><b>'+esc(x.name)+'</b><span class="more"></span></summary>'+x.ids.map(id=>filaHtml(infoLista(id))).join("")+"</details>"}).join("");
+    return '<details class="pag cl"><summary><b>'+esc(x.name)+'</b><span class="more"></span></summary>'+x.ids.map(id=>filaHtml(infoLista(id))).join("")+"</details>"}).join("");
 }
 function clientesHtml(){return '<h2>Clientes</h2><input id="q_busca" type="search" placeholder="Buscar por nombre…" value="'+esc(busca)+'"><div id="lista">'+clientesLista()+"</div>"}
-function reportesHtml(ids){
-  const calle=ids.reduce((t,id)=>t+Math.max(0,calc(L[id]).bal),0),atr=ids.reduce((t,id)=>{const c=calc(L[id]);return t+(c.bal>0?Math.min(c.late,c.bal):0)},0),mes={};
-  ids.forEach(id=>{const l=L[id],c=calc(l),tot=(+l.principal||0)+c.int,r=tot>0?c.int/tot:0;l.pagos.forEach(p=>{const k=(p.d||"").slice(0,7);mes[k]=(mes[k]||0)+p.amt*r})});
-  const ks=Object.keys(mes).sort().slice(-6).reverse();
-  return '<h2>Reportes</h2><section class="cards"><div><span>Plata en la calle</span><b>'+M(calle)+'</b></div><div><span>Atrasado</span><b class="late">'+(calle>0?Math.round(atr/calle*100):0)+'%</b><span>'+M(atr)+'</span></div></section><h2>Ganancia cobrada por mes</h2><section class="cards" style="display:block">'+(ks.length?ks.map(k=>'<div class="sr"><span>'+esc(new Date(k+"-01T00:00").toLocaleDateString("es-CO",{month:"long",year:"numeric"}))+"</span><span>"+M(mes[k])+"</span></div>").join(""):'<div class="empty">Aún no hay pagos.</div>')+"</section>";
+function barra(l,v,mx,txt,sub){return '<div class="bw"><div class="bl"><span>'+l+(sub?'<br><small>'+sub+'</small>':'')+'</span><b>'+txt+'</b></div><div class="bt"><i style="width:'+(mx>0?Math.max(v>0?3:0,Math.min(100,Math.round(v/mx*100))):0)+'%"></i></div></div>'}
+function statsHtml(ids){
+  const m=n=>hide?"••••••":M(n);
+  const calle=ids.reduce((t,id)=>t+Math.max(0,calc(L[id]).bal),0),atr=ids.reduce((t,id)=>{const c=calc(L[id]);return t+(c.bal>0?Math.min(c.late,c.bal):0)},0);
+  const act=ids.filter(id=>calc(L[id]).bal>0).length,pagados=ids.length-act,pers=new Set(ids.map(id=>norm2(L[id].name))).size;
+  const mes={},get=k=>mes[k]||(mes[k]={cob:0,esp:0,gan:0,nue:0,prest:0});
+  ids.forEach(id=>{
+    const l=L[id],c=calc(l),tot=(+l.principal||0)+c.int,r=tot>0?c.int/tot:0;
+    l.pagos.forEach(p=>{const x=get((p.d||"").slice(0,7));x.cob+=p.amt;x.gan+=p.amt*r});
+    if(l.start){
+      for(let k=1;k<=(+l.cuotas||0);k++){const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+(+l.dias||7)*k);get(iso(d).slice(0,7)).esp+=c.cuota}
+      const x=get(l.start.slice(0,7));x.nue++;x.prest+=+l.principal||0;
+    }
+  });
+  const hoyM=today().slice(0,7),ks=Object.keys(mes).filter(k=>k.length===7&&k<=hoyM).sort().slice(-6).reverse();
+  const lab=k=>new Date(k+"-01T00:00").toLocaleDateString("es-CO",{month:"long",year:"numeric"});
+  const mxG=Math.max(0,...ks.map(k=>mes[k].gan)),mxP=Math.max(0,...ks.map(k=>mes[k].prest));
+  const g={};ids.forEach(id=>{const k=norm2(L[id].name);(g[k]=g[k]||{n:L[id].name,a:[]}).a.push(L[id])});
+  const rk=Object.values(g).map(x=>{const s=cumpl(x.a),t=s.ok+s.tarde+s.pend;return{n:x.n,t,pct:t?Math.round(s.ok/t*100):0,atr:s.tarde+s.pend}}).filter(x=>x.t>0);
+  const mejores=rk.slice().sort((a,b)=>b.pct-a.pct||b.t-a.t).slice(0,3),peores=rk.filter(x=>x.pct<100).sort((a,b)=>a.pct-b.pct||b.atr-a.atr).slice(0,3);
+  const fila=x=>'<div class="rk"><span>'+esc(x.n)+'</span><span>'+x.pct+'% a tiempo</span></div>';
+  const box=h=>'<section class="cards" style="display:block"><div>'+h+'</div></section>';
+  return '<h2>Estadísticas</h2><section class="cards"><div><span>Plata en la calle</span><b>'+m(calle)+'</b></div><div><span>Atrasado</span><b class="late">'+(calle>0?Math.round(atr/calle*100):0)+'%</b><span>'+m(atr)+'</span></div><div><span>Préstamos activos</span><b>'+act+'</b></div><div><span>Pagados completos</span><b>'+pagados+'</b><span>'+pers+(pers==1?" cliente":" clientes")+'</span></div></section>'
+   +'<h2>Cobrado contra esperado</h2>'+(ks.length?box(ks.map(k=>{const x=mes[k],p=x.esp>0?Math.round(x.cob/x.esp*100):(x.cob>0?100:0);return barra(esc(lab(k)),Math.min(x.cob,x.esp||x.cob),x.esp||x.cob,p+"%","Cobrado "+m(x.cob)+" · esperado "+m(x.esp))}).join("")):'<div class="empty">Aún no hay datos.</div>')
+   +'<h2>Ganancia cobrada por mes</h2>'+(ks.length?box(ks.map(k=>barra(esc(lab(k)),mes[k].gan,mxG,m(mes[k].gan))).join("")):'<div class="empty">Aún no hay pagos.</div>')
+   +'<h2>Préstamos nuevos por mes</h2>'+(ks.length?box(ks.map(k=>barra(esc(lab(k)),mes[k].prest,mxP,m(mes[k].prest),mes[k].nue+(mes[k].nue==1?" préstamo":" préstamos"))).join("")):'<div class="empty">Aún no hay préstamos.</div>')
+   +'<h2>Mejores pagadores</h2>'+(mejores.length?box(mejores.map(fila).join("")):'<div class="empty">Aún no hay datos.</div>')
+   +'<h2>Los que más se atrasan</h2>'+(peores.length?box(peores.map(fila).join("")):'<div class="empty">Nadie se ha atrasado ✔</div>');
 }
 function view(){
   if(owner&&locked&&pinHash)return $.innerHTML=lockHtml();
   if(owner&&!cur){
     const ids=Object.keys(L);
     let h=topHtml(nCount(ids))+reciboHtml();
-    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?reportesHtml(ids)+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
+    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?statsHtml(ids)+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
     return $.innerHTML=h+(err?'<div class="err">'+esc(err)+"</div>":"")+navHtml()+sheetHtml(ids);
   }
   const l=cur.loan,c=calc(l);let h="";
