@@ -915,4 +915,110 @@ onAuthStateChanged(auth,u=>{
 const cid=new URLSearchParams(location.search).get("c");
 if(cid)getDoc(doc(db,"prestamos",cid)).then(s=>s.exists()&&s.data().uid?getDoc(doc(db,"perfiles",s.data().uid)):null).then(d=>{if(d&&d.exists()){lend=d.data();enhance()}}).catch(()=>{});
 obs.observe(R,{childList:true});enhance();
+</script>
+<script type="module">
+import {getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,doc,onSnapshot,query,where,updateDoc,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const db=getFirestore(getApp()),auth=getAuth(getApp()),R=document.getElementById("root");
+const M=n=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n||0);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(2,"0"),iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()),today=()=>iso(new Date());
+const F=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short",year:"numeric"}):"";
+const n2=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+const hid=()=>{try{return localStorage.getItem("cobros_hide")==="1"}catch(x){return false}};
+const m=n=>hid()?"••••••":M(n);
+let LN={},unsub=null,busy=false;
+
+function calc(l){
+  const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.cuotas||+l.weeks||1,per=+l.dias||7,cuota=(p+int)/w;
+  const g=(l.gastos||[]).reduce((s,x)=>s+x.amt,0),paid=(l.pagos||[]).reduce((s,x)=>s+x.amt,0);
+  const days=l.start?Math.floor((Date.now()-new Date(l.start+"T00:00"))/864e5):0,el=Math.max(0,Math.min(w,Math.floor(days/per)));
+  return{p,int,w,per,cuota,g,paid,late:Math.max(0,el*cuota+g-paid),bal:p+int+g-paid};
+}
+function dues(l,c){const o=[];if(!l.start)return o;for(let k=1;k<=c.w;k++){const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+c.per*k);o.push({k,d:iso(d)})}return o}
+function waUrl(l,txt){let t=String(l.tel||"").replace(/\D/g,"");if(t.length===10)t="57"+t;return"https://wa.me/"+t+"?text="+encodeURIComponent(txt)}
+const link=id=>location.origin+location.pathname+"?c="+id;
+
+function caja(){
+  let cob=0,esp=0,falta=0;
+  Object.values(LN).forEach(l=>{const c=calc(l);
+    (l.pagos||[]).forEach(p=>{if(p.d===today())cob+=p.amt});
+    dues(l,c).forEach(x=>{if(x.d===today()){esp+=c.cuota;falta+=Math.max(0,Math.min(c.cuota,x.k*c.cuota-c.paid))}})});
+  return{cob,esp,falta};
+}
+const proms=()=>Object.keys(LN).filter(id=>{const p=LN[id].promesa;return p&&p.d&&p.d<=today()&&calc(LN[id]).bal>0})
+  .map(id=>({id,l:LN[id],p:LN[id].promesa})).sort((a,b)=>a.p.d<b.p.d?-1:1);
+
+function inicio(){
+  const t=R.querySelector(".tiles");if(!t)return;
+  const k=caja(),pr=proms(),box=document.createElement("div");box.className="xcj";
+  const tl=(a,b)=>'<div class="tl"><span>'+a+"</span><b>"+b+"</b></div>";
+  box.innerHTML='<h2>Cierre de caja de hoy</h2><section class="tiles">'+tl("Cobrado hoy",m(k.cob))+tl("Cuotas de hoy",m(k.esp))+tl("Falta cobrar hoy",m(k.falta))+tl("Promesas de pago",pr.length)+"</section>"
+   +(pr.length?"<h2>Prometieron pagar ("+pr.length+")</h2>"+pr.map(o=>'<div class="al"><button class="nm" data-act="open" data-id="'+o.id+'">'+esc(o.l.name)+"<br><small>"+(o.p.d===today()?"Prometió pagar hoy":'<span class="late">Prometió pagar el '+F(o.p.d)+"</span>")+(o.p.n?" · "+esc(o.p.n):"")+'</small></button><a class="btn ghost" target="_blank" rel="noopener" href="'+waUrl(o.l,"Hola "+o.l.name+", te recuerdo que quedamos en que ibas a pagar"+(o.p.d===today()?" hoy":" el "+F(o.p.d))+". Aquí ves tu préstamo: "+link(o.id))+'">Recordar</a><button class="ghost" data-y="pdone" data-id="'+o.id+'">Listo</button></div>').join(""):"");
+  t.after(box);
+}
+function detalle(){
+  const li=R.querySelector('input[readonly][value*="?c="]'),cp=R.querySelector('[data-act="copy"]'),bar=cp&&cp.closest(".bar");
+  if(!li||!bar)return;
+  const id=(li.value.split("?c=")[1]||"").split("&")[0],l=LN[id];if(!l)return;
+  const card=document.createElement("div");card.className="note xq";card.dataset.id=id;
+  card.innerHTML='<b>Acciones rápidas</b><div class="bar" style="margin:8px 0 0">'+(l.tel?'<a class="btn" href="tel:'+esc(String(l.tel).replace(/[^\d+]/g,""))+'">📞 Llamar</a>':"")
+   +'<button class="ghost" data-y="estado">📄 Estado de cuenta</button><button class="ghost" data-y="total">💰 Cancelar hoy</button><button class="ghost" data-y="prom">🤝 Promesa de pago</button></div>'
+   +(l.promesa&&l.promesa.d?'<p class="sub">Promesa guardada: '+F(l.promesa.d)+(l.promesa.n?" · "+esc(l.promesa.n):"")+"</p>":"")+'<div id="xq_out"></div>';
+  bar.after(card);
+}
+function risk(){
+  const h1=R.querySelector("h1"),n=R.querySelector("#f_n");
+  if(!n||!h1||h1.textContent!=="Nuevo préstamo")return;
+  let d=R.querySelector("#xrisk");if(!d){d=document.createElement("div");d.id="xrisk";n.closest("label").after(d)}
+  const k=n2(n.value);let deuda=0,atr=0,cnt=0;
+  if(k)Object.values(LN).forEach(l=>{if(n2(l.name)===k){const c=calc(l);if(c.bal>0){cnt++;deuda+=c.bal;atr+=Math.min(c.late,c.bal)}}});
+  d.innerHTML=cnt?'<div class="note'+(atr>0?" late":"")+'">⚠ '+esc(n.value.trim())+" ya tiene "+cnt+(cnt==1?" préstamo":" préstamos")+" sin pagar: debe "+M(deuda)+(atr>0?" y está atrasado "+M(atr):"")+".</div>":"";
+}
+function enhance(){
+  if(busy)return;busy=true;obs.disconnect();
+  try{R.querySelectorAll(".xcj,.xq").forEach(x=>x.remove());inicio();detalle();risk()}catch(x){}
+  obs.observe(R,{childList:true});busy=false;
+}
+const obs=new MutationObserver(()=>enhance());
+
+function totalHtml(l,d){
+  const c=calc(l),cap=Math.max(0,c.p+c.g-c.paid),ip=Math.max(0,c.bal-cap),desc=ip*(d/100),pagar=Math.max(0,c.bal-desc);
+  return '<div class="cards" style="margin-top:8px"><div><span>Saldo hoy</span><b>'+M(c.bal)+'</b></div><div><span>Interés que aún falta</span><b>'+M(ip)+'</b></div></div>'
+   +'<label style="margin-top:8px">Descuento sobre ese interés (%)<input id="xq_d" type="number" inputmode="decimal" min="0" max="100" value="'+d+'"></label>'
+   +'<p class="sub">Si cancela hoy paga: <b id="xq_tot">'+M(pagar)+"</b></p>";
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-y]");if(!b)return;const a=b.dataset.y,card=b.closest(".xq"),id=b.dataset.id||(card&&card.dataset.id),l=LN[id];
+  if(!l)return;const out=document.getElementById("xq_out");
+  try{
+    if(a==="pdone"){await updateDoc(doc(db,"prestamos",id),{promesa:deleteField()});return}
+    if(a==="estado"){
+      const c=calc(l),pg=(l.pagos||[]).map(p=>"• "+F(p.d)+" — "+M(p.amt)).join("\n")||"• Aún no hay pagos";
+      return window.open(waUrl(l,"📄 Estado de cuenta — "+l.name+"\nPrestado: "+M(c.p)+" · "+c.w+(c.w==1?" cuota":" cuotas")+" de "+M(c.cuota)+"\n\nPagos:\n"+pg+"\n\nTotal pagado: "+M(c.paid)+"\nSaldo pendiente: "+M(Math.max(0,c.bal))+"\n\nMira tu préstamo aquí: "+link(id)),"_blank");
+    }
+    if(a==="total"){out.innerHTML=totalHtml(l,0);return}
+    if(a==="prom"){const t=new Date();t.setDate(t.getDate()+1);out.innerHTML='<div class="form"><label>¿Qué día prometió pagar?<input id="xp_d" type="date" value="'+iso(t)+'"></label><label>Nota (opcional)<input id="xp_n" type="text" placeholder="Ej: me paga el viernes"></label><button data-y="psave">Guardar promesa</button></div>';return}
+    if(a==="psave"){
+      const d=document.getElementById("xp_d").value;if(!d){out.insertAdjacentHTML("beforeend",'<div class="err">Elige la fecha.</div>');return}
+      b.disabled=true;await updateDoc(doc(db,"prestamos",id),{promesa:{d,n:document.getElementById("xp_n").value.trim(),at:Date.now()}});
+      out.innerHTML='<p class="sub ok">Promesa guardada ✓ Te aparece en Inicio ese día.</p>';
+    }
+  }catch(x){if(out)out.innerHTML='<div class="err">No se pudo ('+esc(x.code||"error")+").</div>"}
+});
+document.addEventListener("input",e=>{
+  if(e.target.id==="f_n")risk();
+  if(e.target.id==="xq_d"){
+    const card=e.target.closest(".xq"),l=card&&LN[card.dataset.id];if(!l)return;
+    const c=calc(l),cap=Math.max(0,c.p+c.g-c.paid),ip=Math.max(0,c.bal-cap),d=Math.min(100,Math.max(0,+e.target.value||0));
+    document.getElementById("xq_tot").textContent=M(Math.max(0,c.bal-ip*d/100));
+  }
+});
+onAuthStateChanged(auth,u=>{
+  if(unsub){unsub();unsub=null}LN={};
+  if(u)unsub=onSnapshot(query(collection(db,"prestamos"),where("uid","==",u.uid)),s=>{LN={};s.forEach(d=>LN[d.id]=d.data());enhance()},()=>{});
+});
+obs.observe(R,{childList:true});enhance();
 </script></body></html>
