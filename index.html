@@ -55,6 +55,13 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .nav button{background:none;color:var(--mut);display:grid;gap:2px;justify-items:center;font-size:11px;padding:4px 10px;border-radius:10px}
 .nav button.on{color:var(--ac)}.nav svg{width:24px;height:24px}
 .nav .plus{background:var(--ac);color:#14110a;width:52px;height:52px;border-radius:99px;margin-top:-22px;padding:0;font-size:28px;line-height:1;place-items:center;border:4px solid var(--bg)}
+.hero{background:linear-gradient(160deg,#211c0e,#12100a);border:1px solid #4a3d16;border-radius:18px;padding:16px;margin:4px 0 12px}
+.hero .hr{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:14px}.hero .xeye{float:none}
+.hero .hb{display:block;font-size:36px;line-height:1.15;color:var(--ac);margin:6px 0 10px;overflow-wrap:anywhere}
+.hero small{display:block;margin-top:8px;color:var(--mut)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.tl{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;min-width:0}
+.tl span{display:block;font-size:12px;color:var(--mut)}.tl b{display:block;font-size:20px;margin-top:4px;overflow-wrap:anywhere}.tl small{display:block;font-size:12px;color:var(--mut);margin-top:2px}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
@@ -162,7 +169,7 @@ function alertHtml(ids){
   let h="";
   if(atr.length)h+='<h2>Atrasados ('+atr.length+')</h2>'+atr.map(i=>row(i,' <small class="late">· '+i.x.dias+(i.x.dias==1?" día":" días")+"</small>","Hola "+i.l.name+", tienes un pago atrasado de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
   if(hoy.length)h+='<h2>Hoy te toca cobrar ('+hoy.length+')</h2>'+hoy.map(i=>row(i,"","Hola "+i.l.name+", te recuerdo que hoy te toca pagar tu cuota de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
-  return h||'<p class="sub ok" style="margin:8px 0">Hoy no tienes cobros ni atrasos ✔</p>';
+  return h;
 }
 function semStats(off,det){
   const t=new Date();t.setHours(0,0,0,0);t.setDate(t.getDate()-((t.getDay()+6)%7)+off*7);
@@ -250,8 +257,12 @@ function panelHtml(){
   return '<section class="cards plan"><details class="big" id="pn"'+(showTabs?" open":"")+'><summary><b style="font-size:16px">Cobros y simulador</b><span class="more">Semana, mes y simulador</span></summary><div class="sch"><div class="tabs">'+tb("sem","Semana")+tb("mes","Mes")+tb("sim","Simulador")+"</div>"+(tab==="mes"?mesBody():tab==="sim"?simBody():semBody())+"</div></details></section>";
 }
 function resumenHtml(ids){
-  const tot=ids.reduce((x,id)=>x+Math.max(0,calc(L[id]).bal),0),prest=ids.reduce((x,id)=>x+(+L[id].principal||0),0),gi=ids.reduce((x,id)=>x+calc(L[id]).int,0),cob=ids.reduce((x,id)=>x+calc(L[id]).paid,0),act=ids.filter(id=>calc(L[id]).bal>0).length;
-  return '<section class="cards plan" style="margin-top:0"><details class="big" id="rs"'+(showRes?" open":"")+'><summary><button class="xeye" data-act="eye" aria-label="Mostrar u ocultar el monto">'+(hide?IEYEC:IEYE)+'</button><span>Por cobrar en total</span><b>'+(hide?"••••••":M(tot))+'</b><span class="more">Ver resumen</span></summary><div class="sch"><section class="cards" style="margin-top:10px"><div><span>Total prestado</span><b>'+M(prest)+'</b><span>'+ids.length+(ids.length==1?" persona":" personas")+'</span></div><div><span>Ganancia (intereses)</span><b>'+M(gi)+'</b></div><div><span>Ya cobrado</span><b>'+M(cob)+'</b></div><div><span>Préstamos activos</span><b>'+act+'</b></div></section></div></details></section>';
+  const sum=f=>ids.reduce((x,id)=>x+f(L[id]),0),m=n=>hide?"••••••":M(n);
+  const tot=sum(l=>Math.max(0,calc(l).bal)),prest=sum(l=>+l.principal||0),gi=sum(l=>calc(l).int),cob=sum(l=>calc(l).paid),act=ids.filter(id=>calc(L[id]).bal>0).length,w=semStats(0),
+    pers=new Set(ids.map(id=>norm2(L[id].name))).size,pct=(prest+gi)>0?Math.min(100,Math.round(cob/(prest+gi)*100)):0;
+  const tile=(l,v,x)=>'<div class="tl"><span>'+l+'</span><b>'+v+'</b>'+(x?"<small>"+x+"</small>":"")+"</div>";
+  return '<section class="hero"><div class="hr"><span>Por cobrar en total</span><button class="xeye" data-act="eye" aria-label="Mostrar u ocultar los montos">'+(hide?IEYEC:IEYE)+'</button></div><b class="hb">'+m(tot)+'</b><div class="prog"><i style="width:'+pct+'%"></i></div><small>'+pct+"% ya cobrado · "+act+(act==1?" préstamo activo":" préstamos activos")+"</small></section>"
+   +'<section class="tiles">'+tile("Total prestado",m(prest),pers+(pers==1?" persona":" personas"))+tile("Ganancia (intereses)",m(gi))+tile("Ya cobrado",m(cob))+tile("Esta semana",m(w.esp),"cobrado "+m(w.cob))+"</section>";
 }
 function infoLista(id){const l=L[id],c=calc(l);return{id,l,c,d:c.bal>0?dueInfo(l,c):{late:null,hoy:null}}}
 function filaHtml(x){
@@ -494,7 +505,7 @@ $.addEventListener("click",async e=>{
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
   if(a==="nav"){nav=b.dataset.t;showMas=nav==="mas";showNotif=false;scrollTo(0,0);return view()}
-  if(a==="notif"){showNotif=true;return view()}
+  if(a==="notif"){if(!nCount(Object.keys(L))&&!(avisosOK()&&!ls.get("cobros_push_owner")))return;showNotif=true;return view()}
   if(a==="close-sheet"){showNotif=false;return view()}
   if(a==="filt"){filt=b.dataset.k;return view()}
   if(a==="eye"){e.preventDefault();hide=!hide;ls.set("cobros_hide",hide?"1":"0");return view()}
