@@ -112,7 +112,7 @@ let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=
   RAW={},P={},privOK=null,unsub2=null,migPriv=false,lockErr="",hiddenAt=0;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(x){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(x){}},del:k=>{try{localStorage.removeItem(k)}catch(x){}}};
 let pinHash=ls.get("cobros_pin")||"",locked=!!pinHash;
-let nav="inicio",filt="todos",showNotif=false,hide=ls.get("cobros_hide")==="1";
+let nav="inicio",filt="todos",showNotif=false,ntab="rec",hide=ls.get("cobros_hide")==="1";
 addEventListener("perfil",()=>{if(owner&&!cur&&!form&&!showNotif)view()});
 const sha=async t=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros:"+t))),b=>b.toString(16).padStart(2,"0")).join("");
 const Fc=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}):"";
@@ -363,7 +363,13 @@ function navHtml(){
 }
 function sheetHtml(ids){
   if(!showNotif)return"";
-  return '<div class="xsheet"><div class="xbk" data-act="close-sheet"></div><div class="xsc"><div class="xhd"><h1>Notificaciones</h1><button class="ghost" data-act="close-sheet">Cerrar</button></div>'+alertHtml(ids)+(avisosOK()&&!ls.get("cobros_push_owner")?'<div class="bar"><button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button></div>':"")+"</div></div>";
+  const r=[];ids.forEach(id=>L[id].pagos.forEach(x=>r.push({id,n:L[id].name,x})));
+  r.sort((a,b)=>a.x.d<b.x.d?1:-1);r.length=Math.min(r.length,30);
+  const n=nCount(ids),tb=(k,l,c)=>'<button class="'+(ntab===k?"":"ghost")+'" data-act="ntab" data-k="'+k+'">'+l+" ("+c+")</button>";
+  const body=ntab==="rec"
+    ?(r.length?r.map(o=>'<button class="item" data-act="open" data-id="'+o.id+'"><span>✅ Pago recibido<small>'+esc(o.n)+" · "+F(o.x.d)+(o.x.n?" · "+esc(o.x.n):"")+'</small></span><b>'+M(o.x.amt)+"</b></button>").join(""):'<div class="empty">Aún no has recibido pagos.</div>')
+    :(n?alertHtml(ids):'<div class="empty">Nada en espera ✔</div>');
+  return '<div class="xsheet"><div class="xbk" data-act="close-sheet"></div><div class="xsc"><div class="xhd"><h1>Notificaciones</h1><button class="ghost" data-act="close-sheet">Cerrar</button></div><div class="tabs">'+tb("rec","Recibidas",r.length)+tb("esp","En espera",n)+"</div>"+body+(avisosOK()&&!ls.get("cobros_push_owner")?'<div class="bar"><button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button></div>':"")+"</div></div>";
 }
 function inicioHtml(ids){
   if(!ids.length)return msg("Aún no tienes préstamos. Toca el botón ＋ para crear el primero.");
@@ -382,8 +388,8 @@ function clientesLista(){
   const g={};Object.keys(L).forEach(id=>{const k=norm2(L[id].name);(g[k]=g[k]||{name:L[id].name,ids:[]}).ids.push(id)});
   const qq=norm2(busca),arr=Object.values(g).filter(x=>!qq||norm2(x.name).includes(qq)).sort((a,b)=>a.name.localeCompare(b.name));
   if(!arr.length)return '<div class="empty">Nadie coincide.</div>';
-  return arr.map(x=>{const bal=x.ids.reduce((t,id)=>t+Math.max(0,calc(L[id]).bal),0),atr=x.ids.some(id=>{const c=calc(L[id]);return c.bal>0&&dueInfo(L[id],c).late});
-    return '<details class="pag"><summary><b>'+esc(x.name)+"</b> · "+M(bal)+(atr?' <span class="late">atrasado</span>':"")+" · "+x.ids.length+(x.ids.length==1?" préstamo":" préstamos")+'<span class="more"></span></summary>'+x.ids.map(id=>filaHtml(infoLista(id))).join("")+"</details>"}).join("");
+  return arr.map(x=>{
+    return '<details class="pag"><summary><b>'+esc(x.name)+'</b><span class="more"></span></summary>'+x.ids.map(id=>filaHtml(infoLista(id))).join("")+"</details>"}).join("");
 }
 function clientesHtml(){return '<h2>Clientes</h2><input id="q_busca" type="search" placeholder="Buscar por nombre…" value="'+esc(busca)+'"><div id="lista">'+clientesLista()+"</div>"}
 function reportesHtml(ids){
@@ -505,8 +511,9 @@ $.addEventListener("click",async e=>{
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
   if(a==="nav"){nav=b.dataset.t;showMas=nav==="mas";showNotif=false;scrollTo(0,0);return view()}
-  if(a==="notif"){if(!nCount(Object.keys(L))&&!(avisosOK()&&!ls.get("cobros_push_owner")))return;showNotif=true;return view()}
+  if(a==="notif"){showNotif=true;return view()}
   if(a==="close-sheet"){showNotif=false;return view()}
+  if(a==="ntab"){ntab=b.dataset.k;return view()}
   if(a==="filt"){filt=b.dataset.k;return view()}
   if(a==="eye"){e.preventDefault();hide=!hide;ls.set("cobros_hide",hide?"1":"0");return view()}
   if(a==="undo"){const id=b.dataset.id,l0=L[id];if(!l0||!confirm("¿Deshacer este pago?"))return;const l=structuredClone(l0);l.pagos.splice(+b.dataset.i,1);b.disabled=true;try{await persist(id,l);L[id]=l;RAW[id]=Object.assign({},RAW[id]||{},{pagos:l.pagos})}catch(x){err="No se pudo deshacer ("+(x.code||"error")+")."}return view()}
