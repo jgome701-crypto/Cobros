@@ -92,11 +92,44 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .xav{width:92px;height:92px;border-radius:99px;overflow:hidden;border:1px solid var(--bd);background:var(--card);display:grid;place-items:center;color:var(--mut);flex:none}
 .xav img{width:100%;height:100%;object-fit:cover}.xav svg{width:46px;height:46px}
 .xlend{display:flex;gap:12px;align-items:center}.xlend .xav{width:56px;height:56px}.xlend .xav svg{width:28px;height:28px}
+
+/* COBROS · nueva experiencia de acceso */
+.auth-shell{min-height:calc(100dvh - 24px);display:flex;align-items:center;justify-content:center;padding:20px 0 34px}
+.auth-card{width:100%;max-width:440px;background:radial-gradient(ellipse at 50% 0%,rgba(212,175,55,.12),transparent 48%),linear-gradient(160deg,#101114,#08090b 72%);border:1px solid #55451b;border-radius:28px;padding:25px 22px;box-shadow:0 22px 65px #0009, inset 0 1px #ffffff08;overflow:hidden;position:relative}
+.auth-brand{text-align:center;margin:0 auto 22px}
+.auth-logo{width:108px;height:98px;object-fit:contain;border-radius:22px;display:block;margin:0 auto 10px;filter:drop-shadow(0 6px 18px #d4af3730)}
+.auth-brand h1{font-size:30px;letter-spacing:2px;color:#e5c45b;font-weight:850}
+.auth-brand p{margin:5px 0 0;color:#a8a8ad;font-size:12px;letter-spacing:2px}
+.auth-rule{height:1px;background:linear-gradient(90deg,transparent,#76602b,transparent);margin:20px 0}
+.auth-title{font-size:25px;line-height:1.2;letter-spacing:-.5px;margin:0 0 8px}
+.auth-copy{color:#aaaab2;margin:0 0 20px;font-size:14px}
+.auth-form{background:rgba(255,255,255,.035);border:1px solid #292a30;border-radius:20px;padding:17px;display:grid;gap:12px}
+.auth-form label{color:#c7c7cd;font-size:12px;gap:6px}
+.auth-form input{background:#101115;border:1px solid #34353d;border-radius:13px;padding:14px 13px;font-size:15px}
+.auth-form input:focus{border-color:#d4af37;outline:2px solid #d4af3726}
+.auth-primary{width:100%;padding:14px 16px;border-radius:14px;font-weight:800;background:linear-gradient(135deg,#f0d56b,#c49b22);box-shadow:0 5px 20px #c39a2420;font-size:15px}
+.auth-secondary{width:100%;padding:12px 14px;border-radius:14px;background:#17181d;border:1px solid #414149;color:#f3ecda}
+.auth-link{background:none!important;border:0!important;color:#e5c45b!important;padding:4px!important;font-size:13px}
+.auth-links{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.auth-bottom{text-align:center;color:#a8a8ad;font-size:13px;margin:17px 0 0}
+.auth-bottom button{display:inline-block;margin-left:5px}
+.auth-points{display:flex;justify-content:center;gap:15px;flex-wrap:wrap;color:#aaaab2;font-size:11px;margin:18px 0 0}
+.auth-points span{display:flex;align-items:center;gap:5px}
+.auth-points i{width:6px;height:6px;border-radius:50%;background:#d4af37;display:inline-block}
+.pw-meter{height:6px;background:#292a30;border-radius:99px;overflow:hidden;margin:3px 0}
+.pw-meter span{height:100%;width:0;display:block;background:#ef6868;transition:width .2s,background .2s}
+.pw-reqs{display:grid;gap:8px;margin:2px 0 5px}
+.pw-req{display:flex;align-items:center;gap:8px;color:#9c9ca5;font-size:12px}
+.pw-req b{display:grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid #50515a;font-size:10px}
+.pw-req.good{color:#68d6a2}.pw-req.good b{background:#174d38;border-color:#2c9a69;color:#fff}
+.auth-note{color:#85858e;font-size:11px;line-height:1.5;margin:0}
+.auth-error{background:#3a191b;border:1px solid #7d3036;color:#ffb7b7;padding:10px 12px;border-radius:12px;font-size:13px}
+@media(min-width:600px){.auth-shell{padding:30px 0}.auth-card{padding:30px}}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,setDoc,deleteDoc,query,where,getDoc,getDocs,writeBatch,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app=initializeApp({
@@ -141,11 +174,56 @@ let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=
   tab="sem",busca="",showPag=false,showRes=false,showTabs=false,showMas=false,lastPay=null,pendingRec=null,
   RAW={},P={},privOK=null,unsub2=null,migPriv=false,lockErr="",hiddenAt=0;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(x){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(x){}},del:k=>{try{localStorage.removeItem(k)}catch(x){}}};
-let pinHash=ls.get("cobros_pin")||"",locked=!!pinHash;
+// Cola local SOLO de pagos pendientes: permite registrar pagos sin señal y sincronizarlos después.
+const payQueueKey=()=>"cobros_pagos_pendientes_"+(auth.currentUser&&auth.currentUser.uid||"sin_usuario");
+function getPayQueue(){try{return JSON.parse(ls.get(payQueueKey())||"[]")}catch(x){return[]}}
+function setPayQueue(a){ls.set(payQueueKey(),JSON.stringify(a))}
+function queueOfflinePayment(id,payment){const a=getPayQueue();a.push({id,payment});setPayQueue(a)}
+function applyQueuedPayments(loan,id){const a=getPayQueue().filter(x=>x.id===id);for(const x of a){if(!loan.pagos.some(p=>p.offlineId&&p.offlineId===x.payment.offlineId))loan.pagos.push(x.payment)}loan.pagos.sort((a,b)=>a.d<b.d?-1:1);return loan}
+let syncingOfflinePayments=false;
+async function syncOfflinePayments(){
+  if(syncingOfflinePayments||!navigator.onLine||!auth.currentUser||privOK!==true)return;
+  const queue=getPayQueue();if(!queue.length)return;syncingOfflinePayments=true;
+  try{
+    for(const id of [...new Set(queue.map(x=>x.id))]){
+      const snap=await getDoc(doc(db,"prestamos",id));if(!snap.exists()||snap.data().uid!==auth.currentUser.uid)continue;
+      let loan=norm(Object.assign({},snap.data(),P[id]||{}));
+      const items=getPayQueue().filter(x=>x.id===id);
+      for(const item of items)if(!loan.pagos.some(p=>p.offlineId===item.payment.offlineId))loan.pagos.push(item.payment);
+      loan.pagos.sort((a,b)=>a.d<b.d?-1:1);
+      await persist(id,loan);
+      setPayQueue(getPayQueue().filter(x=>x.id!==id));
+    }
+  }catch(x){/* La cola se conserva para volver a intentar. */}
+  finally{syncingOfflinePayments=false;if(owner)rebuild()}
+}
+addEventListener("online",()=>{syncOfflinePayments()});
+let pinHash=ls.get("cobros_pin")||"",bioCredential=ls.get("cobros_bio_credential")||"",locked=!!pinHash||!!bioCredential;
 let TR={},unsub3=null,CMP={},cmpOpen=false,cmpSent=false,cmpImg="",calDay="",calOff=0;
 let nav="inicio",filt="todos",showNotif=false,qm="",qd=0,ntab="rec",stBar="cob",stPie="est",hide=ls.get("cobros_hide")==="1";
 addEventListener("perfil",()=>{if(owner&&!cur&&!form&&!showNotif)view()});
 const sha=async t=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros:"+t))),b=>b.toString(16).padStart(2,"0")).join("");
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+const unb64u=s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4)),c=>c.charCodeAt(0));
+function bioAvailable(){return !!(window.isSecureContext&&navigator.credentials&&window.PublicKeyCredential)}
+function randomBytes(n=32){const a=new Uint8Array(n);crypto.getRandomValues(a);return a}
+async function enableBiometric(){
+  if(!bioAvailable())throw new Error("La huella requiere HTTPS y un navegador compatible, como Chrome actualizado.");
+  const user=auth.currentUser;if(!user)throw new Error("Inicia sesión primero.");
+  const challenge=randomBytes(),userId=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros-bio:"+user.uid)));
+  const cred=await navigator.credentials.create({publicKey:{challenge,rp:{name:"COBROS",id:location.hostname},user:{id:userId,name:user.email||user.uid,displayName:user.email||"Usuario COBROS"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",residentKey:"preferred",userVerification:"required"},timeout:60000,attestation:"none"}});
+  if(!cred)throw new Error("No se pudo registrar la huella.");
+  bioCredential=b64u(cred.rawId);ls.set("cobros_bio_credential",bioCredential);ls.set("cobros_bio_uid",user.uid);locked=true;lockErr="";
+}
+async function unlockBiometric(){
+  if(!bioAvailable())throw new Error("La huella requiere HTTPS y un navegador compatible.");
+  if(!bioCredential||ls.get("cobros_bio_uid")!==(auth.currentUser&&auth.currentUser.uid))throw new Error("Vuelve a activar la huella desde Más opciones.");
+  const challenge=randomBytes(),cred=await navigator.credentials.get({publicKey:{challenge,rpId:location.hostname,allowCredentials:[{type:"public-key",id:unb64u(bioCredential)}],userVerification:"required",timeout:60000}});
+  if(!cred||b64u(cred.rawId)!==bioCredential)throw new Error("No se pudo verificar la huella.");
+  const client=JSON.parse(new TextDecoder().decode(cred.response.clientDataJSON));
+  if(client.type!=="webauthn.get"||client.origin!==location.origin||client.challenge!==b64u(challenge))throw new Error("La verificación biométrica no coincide.");
+  locked=false;lockErr="";
+}
 const Fc=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}):"";
 const norm2=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
 const diasEntre=(a,b)=>Math.round((new Date(a+"T00:00")-new Date(b+"T00:00"))/864e5);
@@ -323,10 +401,10 @@ function reciboHtml(){
 }
 function masHtml(){
   return '<details class="pag mas" id="ms"'+(showMas?" open":"")+'><summary>Más opciones<span class="more"></span></summary><div class="bar"><button class="ghost" data-act="exp-prest">Descargar préstamos (Excel)</button><button class="ghost" data-act="exp-pagos">Descargar pagos (Excel)</button><button class="ghost" data-act="exp-todo">Respaldo completo (Excel)</button><button class="ghost" data-act="exp-json">Copia técnica (JSON)</button></div>'
-   +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+"</div>"+(avisosOK()?'<div class="bar">'+(ls.get("cobros_push_owner")?'<span class="ok">🔔 Avisos activados en este celular ✓</span>':'<button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button>')+"</div>":"")+tplBox()+invBox()+"</details>";
+   +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+(bioCredential?'<button class="ghost" data-act="del-bio">Desactivar huella</button>':'<button class="ghost" data-act="set-bio">Activar huella</button>')+"</div>"+(avisosOK()?'<div class="bar">'+(ls.get("cobros_push_owner")?'<span class="ok">🔔 Avisos activados en este celular ✓</span>':'<button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button>')+"</div>":"")+tplBox()+invBox()+"</details>";
 }
 function lockHtml(){
-  return '<h1>Bloqueado</h1><p class="sub">Escribe tu PIN para entrar.</p><div class="form"><label>PIN<input id="f_pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>'+(lockErr?'<div class="err">'+esc(lockErr)+"</div>":"")+'<button data-act="unlock">Entrar</button><button class="ghost" data-act="forgot-pin">Olvidé mi PIN</button></div>';
+  return '<h1>Bloqueado</h1><p class="sub">Desbloquea con tu huella o con tu PIN.</p><div class="form">'+(bioCredential?'<button data-act="unlock-bio">🔒 Desbloquear con huella</button>':'')+(pinHash?'<label>PIN<input id="f_pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>':'')+(lockErr?'<div class="err">'+esc(lockErr)+"</div>":"")+(pinHash?'<button data-act="unlock">Entrar con PIN</button>':'')+'<button class="ghost" data-act="forgot-pin">Volver a iniciar sesión</button></div>';
 }
 function cumpl(arr){
   let ok=0,tarde=0,pend=0,sd=0;
@@ -376,13 +454,18 @@ async function activarAvisos(tipo,loanId){ // pide permiso, obtiene el token del
   }catch(x){alert("No se pudieron activar los avisos ("+(x.code||x.message||"error")+")");return false}
 }
 async function persist(id,loan){
+  if(!auth.currentUser)throw new Error("Inicia sesión para guardar.");
   if(!loan.uid)loan.uid=auth.currentUser.uid;
+  if(loan.uid!==auth.currentUser.uid)throw new Error("No puedes guardar datos de otra cuenta.");
+  // Fallar de forma segura: nunca volver a guardar cédulas/fotos en el documento público.
+  if(privOK!==true)throw new Error("No se pudo verificar el acceso a los datos privados. No se guardó nada; revisa las reglas de Firestore.");
   logAuto(loan,L[id]||TR[id]);
-  if(privOK===true){
-    const pub=Object.assign({},loan),ced=String(loan.cedula||"");delete pub.cedula;delete pub.fotos;delete pub.promesa;delete pub.dir;delete pub.hist;pub.cedulaUlt=ced.slice(-3);
-    const bt=writeBatch(db);bt.set(doc(db,"prestamos",id),pub);bt.set(doc(db,"privados",id),{uid:loan.uid,cedula:ced,fotos:loan.fotos||[],promesa:loan.promesa||null,dir:loan.dir||"",hist:loan.hist||[]});
-    await race(bt.commit());
-  }else await race(setDoc(doc(db,"prestamos",id),loan));
+  const pub=Object.assign({},loan),ced=String(loan.cedula||"");
+  delete pub.cedula;delete pub.fotos;delete pub.promesa;delete pub.dir;delete pub.hist;pub.cedulaUlt=ced.slice(-3);
+  const bt=writeBatch(db);
+  bt.set(doc(db,"prestamos",id),pub);
+  bt.set(doc(db,"privados",id),{uid:loan.uid,cedula:ced,fotos:loan.fotos||[],promesa:loan.promesa||null,dir:loan.dir||"",hist:loan.hist||[]});
+  await race(bt.commit());
 }
 const SV=d=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';
 const IUSER=SV('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>'),IBELL=SV('<path d="M6 17v-6a6 6 0 0 1 12 0v6M4 17h16M10 20.5h4"/>'),IEYE=SV('<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),IEYEC=SV('<path d="M3 11c2.5 3.5 6 5 9 5s6.5-1.5 9-5M6 14.5 4 17M12 16v3M18 14.5l2 2.5"/>');
@@ -467,10 +550,10 @@ function statsHtml(ids){
   return '<h2>Estadísticas</h2><section class="cards"><div><span>Plata en la calle</span><b>'+m(calle)+'</b></div><div><span>Atrasado</span><b class="late">'+(calle>0?Math.round(atr/calle*100):0)+"%</b><span>"+m(atr)+"</span></div></section>"+barras+circ;
 }
 function view(){
-  if(owner&&locked&&pinHash)return $.innerHTML=lockHtml();
+  if(owner&&locked&&(pinHash||bioCredential))return $.innerHTML=lockHtml();
   if(owner&&!cur){
     const ids=Object.keys(L);
-    let h=topHtml(nCount(ids)+Object.keys(CMP).length)+reciboHtml();
+    let h=topHtml(nCount(ids)+Object.keys(CMP).length)+(!navigator.onLine?'<div class="note late">Sin internet: puedes registrar pagos. Quedarán pendientes de sincronización.</div>':(getPayQueue().length?'<div class="note">Pagos pendientes de sincronizar: <b>'+getPayQueue().length+'</b></div>':""))+reciboHtml();
     h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?statsHtml(ids)+calHtml()+negHtml()+papeleraHtml()+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
     return $.innerHTML=h+(err?'<div class="err">'+esc(err)+"</div>":"")+navHtml()+sheetHtml(ids);
   }
@@ -510,7 +593,16 @@ function view(){
   if(zoom>=0&&l.fotos[zoom])h+='<div class="zoom" data-act="unzoom"><img src="'+l.fotos[zoom]+'" alt="Foto"></div>';
   $.innerHTML=h;
 }
-function askLogin(m){$.innerHTML='<h1>Entrar</h1><div class="form">'+inp("f_e","Correo","email","",'autocomplete="username"')+inp("f_pw","Contraseña","password","",'autocomplete="current-password"')+(m?'<div class="err">'+m+"</div>":"")+'<button data-act="login">Entrar</button></div>'}
+function authBrand(){return '<div class="auth-brand"><img class="auth-logo" src="data:image/jpeg;base64,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" alt="Logo COBROS"><h1>COBROS</h1><p>GESTIÓN FINANCIERA SEGURA</p></div>'}
+function authWrap(title,copy,body,foot=''){$.innerHTML='<div class="auth-shell"><section class="auth-card">'+authBrand()+'<div class="auth-rule"></div><h2 class="auth-title">'+title+'</h2><p class="auth-copy">'+copy+'</p>'+body+foot+'<div class="auth-points"><span><i></i> Acceso seguro</span><span><i></i> Tus datos protegidos</span><span><i></i> Simple y rápido</span></div></section></div>'}
+function askLogin(m){
+ const body='<div class="auth-form">'+inp("f_e","Correo electrónico","email","",'autocomplete="username" placeholder="tucorreo@ejemplo.com"')+inp("f_pw","Contraseña","password","",'autocomplete="current-password" placeholder="Escribe tu contraseña"')+(m?'<div class="auth-error">'+esc(m)+"</div>":"")+'<button class="auth-primary" data-act="login">INICIAR SESIÓN</button><div class="auth-links"><button class="auth-link" data-act="recover-view">¿Olvidaste tu contraseña?</button><span style="font-size:11px;color:#777">Firebase seguro</span></div><button class="auth-secondary" data-act="create-account-view">Crear cuenta</button></div>';
+ authWrap('Bienvenido de nuevo','Administra tus préstamos, clientes, cuotas y cobros desde un solo lugar.',body,'<p class="auth-bottom">Tu negocio, en orden.</p>');
+}
+function askRecovery(m){
+ const body='<div class="auth-form">'+inp("f_e","Correo electrónico","email","",'autocomplete="email" placeholder="tucorreo@ejemplo.com"')+(m?'<div class="auth-error">'+esc(m)+"</div>":"")+'<button class="auth-primary" data-act="recover-password">ENVIAR ENLACE</button><button class="auth-secondary" data-act="back-login">Volver al inicio de sesión</button><p class="auth-note">Te enviaremos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.</p></div>';
+ authWrap('Recuperar contraseña','Recupera el acceso a tu cuenta de forma segura.',body);
+}
 
 async function migrar(){ // una sola vez: marca como tuyos los préstamos viejos que no tenían dueño
   if(localStorage.getItem("cobros_mig1"))return;
@@ -521,7 +613,19 @@ async function migrar(){ // una sola vez: marca como tuyos los préstamos viejos
     localStorage.setItem("cobros_mig1","1");
   }catch(x){}
 }
-function askRegister(m){$.innerHTML='<h1>Crear cuenta</h1><p class="sub">Te invitaron a usar la app de cobros. Crea tu usuario para empezar.</p><div class="form">'+inp("f_e","Correo","email","",'autocomplete="username"')+inp("f_pw","Contraseña (mínimo 6 caracteres)","password","",'autocomplete="new-password"')+inp("f_pw2","Repite la contraseña","password","",'autocomplete="new-password"')+(m?'<div class="err">'+esc(m)+"</div>":"")+'<button data-act="register">Crear mi cuenta</button></div>'}
+function askRegister(m){
+ const body='<div class="auth-form">'+inp("f_e","Correo electrónico","email","","autocomplete=\"email\" placeholder=\"tucorreo@ejemplo.com\"")+inp("f_pw","Crear contraseña","password","","autocomplete=\"new-password\" placeholder=\"Crea una contraseña segura\"")+ '<div class="pw-meter"><span id="pw_bar"></span></div><div id="pw_score" class="auth-note">Seguridad de la contraseña: sin evaluar</div><div class="pw-reqs"><div class="pw-req" data-pw="len"><b>✓</b> Al menos 8 caracteres</div><div class="pw-req" data-pw="upper"><b>✓</b> Una letra mayúscula (A–Z)</div><div class="pw-req" data-pw="lower"><b>✓</b> Una letra minúscula (a–z)</div><div class="pw-req" data-pw="num"><b>✓</b> Un número (0–9)</div><div class="pw-req" data-pw="sym"><b>✓</b> Un símbolo (!@#$...)</div><div class="pw-req" data-pw="long"><b>✓</b> 12 caracteres o más (recomendado)</div></div>'+inp("f_pw2","Confirmar contraseña","password","","autocomplete=\"new-password\" placeholder=\"Repite la contraseña\"")+(m?'<div class="auth-error">'+esc(m)+"</div>":"")+'<button class="auth-primary" data-act="register">CREAR CUENTA</button><button class="auth-secondary" data-act="back-login">Volver al inicio de sesión</button><p class="auth-note">La creación de cuenta requiere una invitación válida. Usa una contraseña única que no utilices en otros sitios.</p></div>';
+ authWrap('Crea una contraseña segura','Protege tus clientes y la información de tus préstamos.',body);
+ updatePasswordStrength();
+}
+function updatePasswordStrength(){
+ const el=document.getElementById("f_pw");if(!el)return;
+ const p=el.value,checks={len:p.length>=8,upper:/[A-Z]/.test(p),lower:/[a-z]/.test(p),num:/[0-9]/.test(p),sym:/[^A-Za-z0-9]/.test(p),long:p.length>=12};
+ document.querySelectorAll("[data-pw]").forEach(x=>{const ok=!!checks[x.dataset.pw];x.classList.toggle("good",ok);x.querySelector("b").textContent=ok?"✓":"·"});
+ const n=Object.values(checks).filter(Boolean).length,bar=document.getElementById("pw_bar"),score=document.getElementById("pw_score");
+ if(bar){bar.style.width=(n/6*100)+"%";bar.style.background=n>=5?"#43c88b":n>=3?"#d4af37":"#ef6868"}
+ if(score)score.textContent="Seguridad: "+(n===6?"Muy fuerte":n>=5?"Fuerte":n>=3?"Media":p?"Débil":"sin evaluar");
+}
 async function registerFlow(){
   try{const s=await getDoc(doc(db,"invitaciones",rcode));
     if(!s.exists()||s.data().usado){$.innerHTML=msg("Esta invitación no es válida o ya fue usada. Pídele a quien te la envió una nueva.");return}
@@ -541,7 +645,7 @@ async function save(loan){
   view();
 }
 function rebuild(){
-  L={};TR={};for(const id of Object.keys(RAW)){const p=P[id],x=norm(Object.assign({},RAW[id],p?{cedula:p.cedula||"",fotos:p.fotos||[],promesa:p.promesa||RAW[id].promesa||null,dir:p.dir||RAW[id].dir||"",hist:p.hist||RAW[id].hist||[]}:{}));(x.borrado?TR:L)[id]=x}
+  L={};TR={};for(const id of Object.keys(RAW)){const p=P[id],x=norm(Object.assign({},RAW[id],p?{cedula:p.cedula||"",fotos:p.fotos||[],promesa:p.promesa||RAW[id].promesa||null,dir:p.dir||RAW[id].dir||"",hist:p.hist||RAW[id].hist||[]}:{}));applyQueuedPayments(x,id);(x.borrado?TR:L)[id]=x}
   if(cur&&!cur.draft){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
   if(!form)view();
   migrarPriv();
@@ -745,10 +849,22 @@ function cmpForm(){
 }
 $.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act,v=id=>document.getElementById(id).value;
+  if(a==="recover-view"){return askRecovery()}
+  if(a==="back-login"){return askLogin()}
+  if(a==="create-account-view"){
+    if(!rcode)return askLogin("Para crear una cuenta necesitas abrir un enlace de invitación del administrador.");
+    return registerFlow();
+  }
   if(a==="login"){b.disabled=true;try{await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"));locked=false}catch(x){askLogin("Correo o contraseña incorrectos.")}return}
+  if(a==="recover-password"){
+    const em=v("f_e").trim();if(!em){askRecovery("Escribe tu correo para enviarte el enlace de recuperación.");return}
+    b.disabled=true;try{await sendPasswordResetEmail(auth,em);askRecovery("Si existe una cuenta con ese correo, recibirás un enlace. Revisa también spam.")}
+    catch(x){askRecovery(x.code==="auth/invalid-email"?"El correo no tiene un formato válido.":"No se pudo enviar el correo. Revisa la dirección y la configuración de Firebase Authentication.")}
+    return;
+  }
   if(a==="register"){
     const em=v("f_e").trim(),p1=v("f_pw"),p2=v("f_pw2");
-    if(!em||p1.length<6)return askRegister("Escribe tu correo y una contraseña de al menos 6 caracteres.");
+    if(!em||p1.length<8||!/[A-Z]/.test(p1)||!/[a-z]/.test(p1)||!/[0-9]/.test(p1)||! /[^A-Za-z0-9]/.test(p1))return askRegister("La contraseña debe tener mínimo 8 caracteres, mayúscula, minúscula, número y símbolo.");
     if(p1!==p2)return askRegister("Las contraseñas no coinciden.");
     b.disabled=true;
     try{
@@ -789,7 +905,10 @@ $.addEventListener("click",async e=>{
   if(a==="undo"){const id=b.dataset.id,l0=L[id];if(!l0||!confirm("¿Deshacer este pago?"))return;const l=structuredClone(l0);l.pagos.splice(+b.dataset.i,1);b.disabled=true;try{await persist(id,l);L[id]=l;RAW[id]=Object.assign({},RAW[id]||{},{pagos:l.pagos})}catch(x){err="No se pudo deshacer ("+(x.code||"error")+")."}return view()}
   if(a==="push-owner"){b.disabled=true;await activarAvisos("prestamista");showMas=true;return view()}
   if(a==="unlock"){const h=await sha(v("f_pin").trim());if(h===pinHash){locked=false;lockErr=""}else lockErr="PIN incorrecto.";return view()}
-  if(a==="forgot-pin"){if(confirm("Para entrar sin el PIN tienes que volver a iniciar sesión con tu contraseña. ¿Continuar?")){pinHash="";ls.del("cobros_pin");locked=false;lockErr="";signOut(auth)}return}
+  if(a==="unlock-bio"){b.disabled=true;try{await unlockBiometric()}catch(x){lockErr=x.message||"No se pudo verificar la huella."}return view()}
+  if(a==="forgot-pin"){if(confirm("Se quitará el bloqueo local de este celular. Luego tendrás que entrar otra vez con tu correo y contraseña. ¿Continuar?")){pinHash="";bioCredential="";ls.del("cobros_pin");ls.del("cobros_bio_credential");ls.del("cobros_bio_uid");locked=false;lockErr="";signOut(auth)}return}
+  if(a==="set-bio"){b.disabled=true;try{await enableBiometric();showMas=true;return view()}catch(x){err=x.message||"No se pudo activar la huella.";showMas=true;return view()}}
+  if(a==="del-bio"){if(confirm("¿Desactivar el desbloqueo por huella en este celular?")){bioCredential="";ls.del("cobros_bio_credential");ls.del("cobros_bio_uid");locked=!!pinHash;showMas=true;view()}return}
   if(a==="set-pin"){const p1=prompt("Escribe un PIN de 4 a 8 números");if(p1===null)return;if(!/^\d{4,8}$/.test(p1.trim())){err="El PIN debe tener entre 4 y 8 números.";showMas=true;return view()}const p2=prompt("Repite el PIN");if(p2===null)return;if(p1.trim()!==p2.trim()){err="Los PIN no coinciden.";showMas=true;return view()}pinHash=await sha(p1.trim());ls.set("cobros_pin",pinHash);showMas=true;return view()}
   if(a==="del-pin"){if(confirm("¿Quitar el PIN de bloqueo?")){pinHash="";locked=false;ls.del("cobros_pin");showMas=true;view()}return}
   if(a==="close-rec"){lastPay=null;return view()}
@@ -857,7 +976,11 @@ $.addEventListener("click",async e=>{
     if(JSON.stringify(l).length>900000){err="Las fotos pesan demasiado. Quita alguna.";return view()}
   }else if(a==="save-pago"||a==="save-gasto"){
     const amt=+v("f_a");if(!(amt>0)){err="Escribe un monto válido.";return view()}
-    if(a==="save-pago"){l.pagos.push({d:v("f_d"),amt,n:v("f_t").trim()});pendingRec={id:cur.id,amt,d:v("f_d")}}
+    if(a==="save-pago"){
+      const payment={d:v("f_d"),amt,n:v("f_t").trim()};pendingRec={id:cur.id,amt,d:v("f_d")};
+      if(!navigator.onLine){payment.offlineId=newId();queueOfflinePayment(cur.id,payment);l.pagos.push(payment);l.pagos.sort((x,y)=>x.d<y.d?-1:1);L[cur.id]=l;cur.loan=l;form=null;err="Pago guardado en este celular. Se sincronizará cuando vuelva internet.";return view()}
+      l.pagos.push(payment);
+    }
     else{if(!v("f_t").trim()){err="Escribe una descripción.";return view()}l.gastos.push({d:v("f_d"),amt,desc:v("f_t").trim()})}
     l.pagos.sort((x,y)=>x.d<y.d?-1:1);l.gastos.sort((x,y)=>x.d<y.d?-1:1);
   }else if(a==="del-pago"||a==="del-gasto"){
@@ -897,11 +1020,12 @@ $.addEventListener("input",e=>{
   if(!k)return;simv[k]=e.target.value;const o=document.getElementById("sim_out");if(o)o.innerHTML=simHtml();
 });
 $.addEventListener("toggle",e=>{if(e.target.id==="sch")showSch=e.target.open;if(e.target.id==="sim")showSim=e.target.open;if(e.target.id==="wk")showWk=e.target.open;if(e.target.id==="sw")showWeek=e.target.open;if(e.target.id==="pn")showTabs=e.target.open;if(e.target.id==="rs")showRes=e.target.open;if(e.target.id==="pag")showPag=e.target.open;if(e.target.id==="ms")showMas=e.target.open},true);
+$.addEventListener("input",e=>{if(e.target&&e.target.id==="f_pw"&&document.querySelector(".pw-reqs"))updatePasswordStrength()});
 $.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.target.id==="f_pw"||e.target.id==="f_pw2"||e.target.id==="f_pin")){const bt=document.querySelector('[data-act="login"]')||document.querySelector('[data-act="register"]')||document.querySelector('[data-act="unlock"]');if(bt)bt.click()}});
 
 // ---- Arranque ----
 const c=q.get("c");
-document.addEventListener("visibilitychange",()=>{if(document.hidden)hiddenAt=Date.now();else if(pinHash&&owner&&hiddenAt&&Date.now()-hiddenAt>60000){locked=true;view()}});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)hiddenAt=Date.now();else {if((pinHash||bioCredential)&&owner&&hiddenAt&&Date.now()-hiddenAt>60000){locked=true;view()}if(navigator.onLine)syncOfflinePayments()}});
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;if(!owner&&cur)view()});
 if(c){ // vista del cliente: solo lectura, sin sesión
   try{ // manifiesto propio: la app instalada se abre directo en el préstamo de este cliente
@@ -917,16 +1041,17 @@ if(c){ // vista del cliente: solo lectura, sin sesión
 function startOwner(){
   onAuthStateChanged(auth,u=>{
     if(unsub){unsub();unsub=null}if(unsub2){unsub2();unsub2=null}if(unsub3){unsub3();unsub3=null}CMP={};
-    if(!u){owner=false;L={};RAW={};P={};privOK=null;migPriv=false;cur=null;form=null;lastPay=null;locked=!!pinHash;return askLogin()}
+    if(!u){owner=false;L={};RAW={};P={};privOK=null;migPriv=false;cur=null;form=null;lastPay=null;locked=!!pinHash||!!bioCredential;return askLogin()}
     owner=true;
     if(u.uid===ADMIN)migrar();
     unsub2=onSnapshot(query(collection(db,"privados"),where("uid","==",u.uid)),
-      s=>{P={};s.forEach(d=>P[d.id]=d.data());privOK=true;rebuild()},
+      s=>{P={};s.forEach(d=>P[d.id]=d.data());privOK=true;rebuild();syncOfflinePayments()},
       ()=>{P={};privOK=false;rebuild()});
     unsub3=onSnapshot(query(collection(db,"comprobantes"),where("uid","==",u.uid)),s=>{CMP={};s.forEach(d=>CMP[d.id]=d.data());if(!form)view()},()=>{});
     unsub=onSnapshot(query(collection(db,"prestamos"),where("uid","==",u.uid)),
       s=>{RAW={};s.forEach(d=>RAW[d.id]=d.data());rebuild()},
       e=>$.innerHTML=msg("No se pudo leer los datos ("+esc(e.code)+"). Revisa las reglas de Firestore."));
+    if(navigator.onLine)syncOfflinePayments();
   });
 }
 </script>
