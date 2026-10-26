@@ -78,6 +78,8 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .tb td{background:#dce6f1;color:#111;padding:4px 10px;text-align:center;border:1px solid #fff}
 .tb tr:nth-child(odd) td{background:#fff}
 .tb.v th{background:#4f6228}.tb.v td,.tb.v tr:nth-child(odd) td{background:#ebf1de}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin:8px 0}.cal b{font-size:12px;color:var(--mut)}.cal button{padding:9px 0;position:relative}.cal button.hoy{border-color:var(--ac)}.cal u{position:absolute;left:50%;bottom:3px;width:6px;height:6px;border-radius:99px;transform:translateX(-50%)}
+.cmp img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--bd)}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
@@ -128,7 +130,8 @@ let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=
   RAW={},P={},privOK=null,unsub2=null,migPriv=false,lockErr="",hiddenAt=0;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(x){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(x){}},del:k=>{try{localStorage.removeItem(k)}catch(x){}}};
 let pinHash=ls.get("cobros_pin")||"",locked=!!pinHash;
-let nav="inicio",filt="todos",showNotif=false,ntab="rec",stBar="cob",stPie="est",hide=ls.get("cobros_hide")==="1";
+let TR={},unsub3=null,CMP={},cmpOpen=false,cmpSent=false,cmpImg="",calDay="";
+let nav="inicio",filt="todos",showNotif=false,qm="",qd=0,ntab="rec",stBar="cob",stPie="est",hide=ls.get("cobros_hide")==="1";
 addEventListener("perfil",()=>{if(owner&&!cur&&!form&&!showNotif)view()});
 const sha=async t=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros:"+t))),b=>b.toString(16).padStart(2,"0")).join("");
 const Fc=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}):"";
@@ -153,7 +156,7 @@ function prevHtml(){return fotosTmp.map((f,i)=>'<div class="th"><img src="'+f+'"
 function prev(){const p=document.getElementById("f_prev");if(p)p.innerHTML=prevHtml()}
 function formHtml(){
   const l=cur.loan;let h='<div class="form">';
-  if(form==="setup")h+=(renewBal>0?'<div class="note">Ojo: esta persona aún debe '+M(renewBal)+' del préstamo anterior. El préstamo nuevo se maneja por separado.</div>':"")+inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+inp("f_tel","Celular / WhatsApp (opcional)","tel",l.tel||"",'inputmode="tel"')+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Cada cuántos días paga (7 = semanal)","number",l.dias||7)+'<div class="bar" style="margin:0"><button class="ghost" data-act="dias" data-d="7">Cada semana</button><button class="ghost" data-act="dias" data-d="15">Quincena</button><button class="ghost" data-act="dias" data-d="30">Cada mes</button></div>'+inp("f_mora","Mora por semana de atraso, % (opcional)","number",l.mora||"",'inputmode="decimal" step="any"')+'<div id="f_sim">'+newSimHtml(+l.principal||0,+l.rate||0,+l.cuotas||0,+l.dias||7,l.start||today())+"</div>"+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+'</div><small id="f_msg" class="late"></small>';
+  if(form==="setup")h+=(cur.refi&&L[cur.refi]?'<div class="note">Refinanciando: el saldo anterior ya está sumado al monto. Al guardar, el préstamo anterior queda en $0.</div>':"")+(renewBal>0?'<div class="note">Ojo: esta persona aún debe '+M(renewBal)+' del préstamo anterior. El préstamo nuevo se maneja por separado.</div>':"")+inp("f_n","Nombre de la persona","text",l.name)+inp("f_c","Cédula","text",l.cedula||"",'inputmode="numeric"')+'<div id="f_risk">'+riskHtml(l.name,l.cedula,cur.id)+"</div>"+inp("f_tel","Celular / WhatsApp (opcional)","tel",l.tel||"",'inputmode="tel"')+inp("f_dir","Dirección o barrio (opcional)","text",l.dir||"")+inp("f_p","Monto prestado (COP)","number",l.principal||"",'inputmode="numeric"')+inp("f_r","Interés total (% sobre lo prestado)","number",l.rate||"",'step="any"')+inp("f_w","Número de cuotas","number",l.cuotas||"")+inp("f_k","Cada cuántos días paga (7 = semanal)","number",l.dias||7)+'<div class="bar" style="margin:0"><button class="ghost" data-act="dias" data-d="7">Cada semana</button><button class="ghost" data-act="dias" data-d="15">Quincena</button><button class="ghost" data-act="dias" data-d="30">Cada mes</button></div>'+inp("f_mora","Mora por semana de atraso, % (opcional)","number",l.mora||"",'inputmode="decimal" step="any"')+'<div id="f_sim">'+newSimHtml(+l.principal||0,+l.rate||0,+l.cuotas||0,+l.dias||7,l.start||today())+"</div>"+inp("f_d","Fecha del préstamo","date",l.start||today())+'<label>Fotos de la persona (máx. 4)<input id="f_f" type="file" accept="image/*" multiple></label><div id="f_prev" class="thumbs">'+prevHtml()+'</div><small id="f_msg" class="late"></small>';
   if(form==="pago")h+=inp("f_d","Fecha del pago","date",today())+inp("f_a","Monto pagado (COP)","number","",'inputmode="numeric"')+inp("f_t","Nota (opcional)","text","");
   if(form==="gasto")h+=inp("f_d","Fecha","date",today())+inp("f_t","Descripción del gasto","text","")+inp("f_a","Monto (COP)","number","",'inputmode="numeric"');
   if(err)h+='<div class="err">'+esc(err)+"</div>";
@@ -183,8 +186,8 @@ function alertHtml(ids){
   atr.sort((p,q)=>q.x.dias-p.x.dias);
   const row=(i,sub,txt)=>'<div class="al"><button class="nm" data-act="open" data-id="'+i.id+'">'+esc(i.l.name)+sub+'<br><b>'+M(i.x.amt)+'</b></button><button data-act="pagar" data-id="'+i.id+'" data-amt="'+Math.round(i.x.amt)+'">✓ Pagó</button><a class="btn ghost" target="_blank" rel="noopener" href="'+waLink(i.l,txt)+'">Recordar</a></div>';
   let h="";
-  if(atr.length)h+='<h2>Atrasados ('+atr.length+')</h2>'+atr.map(i=>row(i,' <small class="late">· '+i.x.dias+(i.x.dias==1?" día":" días")+"</small>","Hola "+i.l.name+", tienes un pago atrasado de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
-  if(hoy.length)h+='<h2>Hoy te toca cobrar ('+hoy.length+')</h2>'+hoy.map(i=>row(i,"","Hola "+i.l.name+", te recuerdo que hoy te toca pagar tu cuota de "+M(i.x.amt)+". Aquí puedes ver tu préstamo: "+clientLink(i.id))).join("");
+  if(atr.length)h+='<h2>Atrasados ('+atr.length+')</h2>'+atr.map(i=>row(i,' <small class="late">· '+i.x.dias+(i.x.dias==1?" día":" días")+"</small>",tplFill(i.x.dias>=15?"fi":"at",i.l,i.id,i.x.amt,i.x.dias))).join("");
+  if(hoy.length)h+='<h2>Hoy te toca cobrar ('+hoy.length+')</h2>'+hoy.map(i=>row(i,"",tplFill("am",i.l,i.id,i.x.amt))).join("");
   return h;
 }
 function semStats(off,det){
@@ -270,7 +273,7 @@ function simBody(){
 }
 function panelHtml(){
   const tb=(t,l)=>'<button class="'+(tab===t?"":"ghost")+'" data-act="tab" data-t="'+t+'">'+l+"</button>";
-  return '<section class="cards plan"><details class="big" id="pn"'+(showTabs?" open":"")+'><summary><b style="font-size:16px">Cobros y simulador</b><span class="more">Semana, mes y simulador</span></summary><div class="sch"><div class="tabs">'+tb("sem","Semana")+tb("mes","Mes")+tb("sim","Simulador")+"</div>"+(tab==="mes"?mesBody():tab==="sim"?simBody():semBody())+"</div></details></section>";
+  return '<section class="cards plan"><details class="big" id="pn"'+(showTabs?" open":"")+'><summary><b style="font-size:16px">Cobros y simulador</b><span class="more">Semana, mes y simulador</span></summary><div class="sch"><div class="tabs">'+tb("sem","Semana")+tb("mes","Mes")+tb("cal","Calendario")+tb("sim","Simulador")+"</div>"+(tab==="mes"?mesBody():tab==="sim"?simBody():tab==="cal"?calBody():semBody())+"</div></details></section>";
 }
 function resumenHtml(ids){
   const sum=f=>ids.reduce((x,id)=>x+f(L[id]),0),m=n=>hide?"••••••":M(n);
@@ -308,7 +311,7 @@ function reciboHtml(){
 }
 function masHtml(){
   return '<details class="pag mas" id="ms"'+(showMas?" open":"")+'><summary>Más opciones<span class="more"></span></summary><div class="bar"><button class="ghost" data-act="exp-prest">Descargar préstamos (Excel)</button><button class="ghost" data-act="exp-pagos">Descargar pagos (Excel)</button><button class="ghost" data-act="exp-todo">Respaldo completo (Excel)</button><button class="ghost" data-act="exp-json">Copia técnica (JSON)</button></div>'
-   +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+"</div>"+(avisosOK()?'<div class="bar">'+(ls.get("cobros_push_owner")?'<span class="ok">🔔 Avisos activados en este celular ✓</span>':'<button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button>')+"</div>":"")+invBox()+"</details>";
+   +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+"</div>"+(avisosOK()?'<div class="bar">'+(ls.get("cobros_push_owner")?'<span class="ok">🔔 Avisos activados en este celular ✓</span>':'<button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button>')+"</div>":"")+tplBox()+invBox()+"</details>";
 }
 function lockHtml(){
   return '<h1>Bloqueado</h1><p class="sub">Escribe tu PIN para entrar.</p><div class="form"><label>PIN<input id="f_pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>'+(lockErr?'<div class="err">'+esc(lockErr)+"</div>":"")+'<button data-act="unlock">Entrar</button><button class="ghost" data-act="forgot-pin">Olvidé mi PIN</button></div>';
@@ -362,9 +365,10 @@ async function activarAvisos(tipo,loanId){ // pide permiso, obtiene el token del
 }
 async function persist(id,loan){
   if(!loan.uid)loan.uid=auth.currentUser.uid;
+  logAuto(loan,L[id]||TR[id]);
   if(privOK===true){
-    const pub=Object.assign({},loan),ced=String(loan.cedula||"");delete pub.cedula;delete pub.fotos;pub.cedulaUlt=ced.slice(-3);
-    const bt=writeBatch(db);bt.set(doc(db,"prestamos",id),pub);bt.set(doc(db,"privados",id),{uid:loan.uid,cedula:ced,fotos:loan.fotos||[]});
+    const pub=Object.assign({},loan),ced=String(loan.cedula||"");delete pub.cedula;delete pub.fotos;delete pub.promesa;delete pub.dir;delete pub.hist;pub.cedulaUlt=ced.slice(-3);
+    const bt=writeBatch(db);bt.set(doc(db,"prestamos",id),pub);bt.set(doc(db,"privados",id),{uid:loan.uid,cedula:ced,fotos:loan.fotos||[],promesa:loan.promesa||null,dir:loan.dir||"",hist:loan.hist||[]});
     await race(bt.commit());
   }else await race(setDoc(doc(db,"prestamos",id),loan));
 }
@@ -389,7 +393,7 @@ function sheetHtml(ids){
 }
 function inicioHtml(ids){
   if(!ids.length)return msg("Aún no tienes préstamos. Toca el botón ＋ para crear el primero.");
-  return resumenHtml(ids)+alertHtml(ids);
+  return resumenHtml(ids)+cmpBanner()+cajaHtml(ids)+alertHtml(ids);
 }
 function cobrosHtml(){
   const fb=(k,l)=>'<button class="'+(filt===k?"":"ghost")+'" data-act="filt" data-k="'+k+'">'+l+"</button>";
@@ -454,8 +458,8 @@ function view(){
   if(owner&&locked&&pinHash)return $.innerHTML=lockHtml();
   if(owner&&!cur){
     const ids=Object.keys(L);
-    let h=topHtml(nCount(ids))+reciboHtml();
-    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?statsHtml(ids)+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
+    let h=topHtml(nCount(ids)+Object.keys(CMP).length)+reciboHtml();
+    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?statsHtml(ids)+negHtml()+papeleraHtml()+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
     return $.innerHTML=h+(err?'<div class="err">'+esc(err)+"</div>":"")+navHtml()+sheetHtml(ids);
   }
   const l=cur.loan,c=calc(l);let h="";
@@ -475,21 +479,22 @@ function view(){
       +S.map(x=>'<div class="sr"><span>Cuota '+x.k+" · "+F(x.d)+"</span><span>"+M(c.cuota)+" · "+(x.cov?'<span class="ok">Pagada</span>':x.late?'<span class="late">Atrasada</span>':"Pendiente")+"</span></div>").join("")+"</div></details></section>";
   }
   if(owner){
-    h+=form?formHtml():'<div class="bar"><button data-act="pago">+ Pago</button><button data-act="gasto">+ Gasto</button><button class="ghost" data-act="setup">Editar préstamo</button>'+(l.name?'<button class="ghost" data-act="renew">Renovar / prestar más</button>':"")+"</div>";
+    h+=form?formHtml():'<div class="bar"><button data-act="pago">+ Pago</button><button data-act="gasto">+ Gasto</button><button class="ghost" data-act="setup">Editar préstamo</button>'+(l.name?'<button class="ghost" data-act="renew">Renovar / prestar más</button>':"")+(l.name&&c.bal>0?'<button class="ghost" data-act="refi">Refinanciar (sumar saldo)</button>':"")+"</div>";
     if(l.name){
       const link=location.origin+location.pathname+"?c="+cur.id;
       h+='<label>Link para tu cliente<input readonly value="'+link+'" onclick="this.select()"></label>';
       h+='<div class="bar"><button class="ghost" data-act="copy">Copiar link</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent("Aquí puedes ver el estado de tu préstamo: "+link)+'">Enviar por WhatsApp</a></div>';
     }
     if(err&&!form)h+='<div class="err">'+esc(err)+"</div>";
-    if(l.name&&!form)h+=moraBox(l,c)+cumplHtml(l);
+    if(l.name&&!form)h+=accionesHtml(l,c)+moraBox(l,c)+cumplHtml(l)+cmpHtml(cur.id)+histHtml(l);
   }
   if(l.name&&l.fotos.length)h+='<h2>Fotos</h2><div class="thumbs">'+l.fotos.map((f,i)=>'<img src="'+f+'" data-act="zoom" data-i="'+i+'" alt="Foto '+(i+1)+'">').join("")+"</div>";
   if(l.name){
     h+=list("Pagos",l.pagos,"pago",x=>"<b>"+M(x.amt)+"</b><br><small>"+F(x.d)+(x.n?" · "+esc(x.n):"")+"</small>");
     h+=list("Gastos",l.gastos,"gasto",x=>"<b>"+M(x.amt)+"</b> · "+esc(x.desc)+"<br><small>"+F(x.d)+"</small>");
   }
-  if(owner&&l.name)h+='<div class="bar"><button class="ghost" data-act="'+(askDel?"del-loan":"ask-del")+'">'+(askDel?"Toca otra vez para eliminar":"Eliminar préstamo")+"</button></div>";
+  if(!owner&&l.name)h+=cmpForm();
+  if(owner&&l.name)h+='<div class="bar"><button class="ghost" data-act="'+(askDel?"del-loan":"ask-del")+'">'+(askDel?"Toca otra vez para mandarlo a la papelera":"Eliminar préstamo")+"</button></div>";
   if(zoom>=0&&l.fotos[zoom])h+='<div class="zoom" data-act="unzoom"><img src="'+l.fotos[zoom]+'" alt="Foto"></div>';
   $.innerHTML=h;
 }
@@ -524,7 +529,7 @@ async function save(loan){
   view();
 }
 function rebuild(){
-  L={};for(const id of Object.keys(RAW)){const p=P[id];L[id]=norm(Object.assign({},RAW[id],p?{cedula:p.cedula||"",fotos:p.fotos||[]}:{}))}
+  L={};TR={};for(const id of Object.keys(RAW)){const p=P[id],x=norm(Object.assign({},RAW[id],p?{cedula:p.cedula||"",fotos:p.fotos||[],promesa:p.promesa||RAW[id].promesa||null,dir:p.dir||RAW[id].dir||"",hist:p.hist||RAW[id].hist||[]}:{}));(x.borrado?TR:L)[id]=x}
   if(cur&&!cur.draft){if(L[cur.id])cur.loan=L[cur.id];else cur=null}
   if(!form)view();
   migrarPriv();
@@ -641,6 +646,90 @@ function hojaGastos(){
   r.sort((a,b)=>a[0]<b[0]?1:a[0]>b[0]?-1:0);
   return{name:"Gastos",cols:[{h:"Fecha",w:15,t:"date"},{h:"Persona",w:26,t:"txt"},{h:"Descripción",w:28,t:"txt"},{h:"Monto",w:16,t:"money"}],rows:r,total:{sum:[3]}};
 }
+
+// ---- extras: mensajes, negocio, caja, promesas, riesgo, acciones ----
+const TPL0={am:"Hola {n}, te recuerdo que hoy te toca pagar tu cuota de {m}. ¡Gracias! {l}",at:"Hola {n}, tienes un pago atrasado de {m}. Por favor ponte al día. Mira tu préstamo: {l}",fi:"{n}, tu pago de {m} lleva {d} días de atraso. Necesito que lo cancelemos hoy. {l}"};
+const tplGet=()=>{try{return Object.assign({},TPL0,JSON.parse(ls.get("cobros_tpl")||"{}"))}catch(x){return TPL0}};
+const tplFill=(k,l,id,amt,dias)=>tplGet()[k].replace(/\{n\}/g,l.name).replace(/\{m\}/g,M(amt)).replace(/\{d\}/g,dias||0).replace(/\{l\}/g,clientLink(id));
+function tplBox(){const t=tplGet();return '<h2>Mensajes de WhatsApp</h2><p class="sub">Usa {n} nombre, {m} monto, {d} días de atraso, {l} link.</p><div class="form">'+inp("t_am","Amable (cuota de hoy)","text",t.am)+inp("t_at","Atraso","text",t.at)+inp("t_fi","Firme (15+ días)","text",t.fi)+'<div class="bar" style="margin:0"><button data-act="tpl-save">Guardar mensajes</button><button class="ghost" data-act="tpl-reset">Restaurar</button></div></div>'}
+const NEG=()=>{try{return Object.assign({meta:0,g:[]},JSON.parse(ls.get("cobros_neg")||"{}"))}catch(x){return{meta:0,g:[]}}};
+function negHtml(){
+  const n=NEG(),ym=today().slice(0,7),m=v=>hide?"••••••":M(v);let gan=0;
+  Object.keys(L).forEach(id=>{const l=L[id],c=calc(l),t=(+l.principal||0)+c.int,r=t>0?c.int/t:0;l.pagos.forEach(p=>{if((p.d||"").startsWith(ym))gan+=p.amt*r})});
+  const gs=n.g.filter(x=>x.d.startsWith(ym)),ge=gs.reduce((t,x)=>t+x.amt,0),neta=gan-ge,pct=n.meta>0?Math.max(0,Math.min(100,Math.round(neta/n.meta*100))):0;
+  return '<h2>Mi negocio este mes</h2><section class="cards"><div><span>Ganancia cobrada</span><b>'+m(gan)+'</b></div><div><span>Gastos</span><b>'+m(ge)+'</b></div><div class="big"><span>Ganancia neta'+(n.meta>0?" · meta "+M(n.meta):"")+'</span><b>'+m(neta)+"</b>"+(n.meta>0?'<div class="prog"><i style="width:'+pct+'%"></i></div><span>'+pct+"% de la meta</span>":"")+"</div></section>"
+   +'<div class="form">'+inp("n_meta","Meta mensual de ganancia (COP)","number",n.meta||"",'inputmode="numeric"')+'<button class="ghost" data-act="neg-meta">Guardar meta</button>'+inp("n_d","Gasto del negocio (gasolina, papelería…)","text","")+inp("n_a","Monto (COP)","number","",'inputmode="numeric"')+'<button class="ghost" data-act="neg-gasto">Agregar gasto</button></div>'
+   +gs.map(x=>'<div class="row"><div>'+m(x.amt)+" · "+esc(x.desc)+"<br><small>"+F(x.d)+'</small></div><button class="x" data-act="neg-del" data-i="'+n.g.indexOf(x)+'" aria-label="Eliminar">✕</button></div>').join("");
+}
+function cajaHtml(ids){
+  const m=v=>hide?"••••••":M(v);let cob=0,esp=0,fal=0;const pr=[];
+  ids.forEach(id=>{const l=L[id],c=calc(l);l.pagos.forEach(p=>{if(p.d===today())cob+=p.amt});sched(l,c).forEach(x=>{if(x.d===today()){esp+=c.cuota;fal+=Math.max(0,Math.min(c.cuota,x.k*c.cuota-c.paid))}});if(l.promesa&&l.promesa.d&&l.promesa.d<=today()&&c.bal>0)pr.push({id,l,p:l.promesa})});
+  const tl=(a,b)=>'<div class="tl"><span>'+a+"</span><b>"+b+"</b></div>";
+  return '<h2>Cierre de caja de hoy</h2><section class="tiles">'+tl("Cobrado hoy",m(cob))+tl("Cuotas de hoy",m(esp))+tl("Falta cobrar hoy",m(fal))+tl("Promesas",pr.length)+"</section>"
+   +(pr.length?"<h2>Prometieron pagar ("+pr.length+")</h2>"+pr.map(o=>'<div class="al"><button class="nm" data-act="open" data-id="'+o.id+'">'+esc(o.l.name)+'<br><small class="'+(o.p.d<today()?"late":"")+'">'+(o.p.d===today()?"Prometió pagar hoy":"Prometió el "+F(o.p.d))+(o.p.n?" · "+esc(o.p.n):"")+'</small></button><a class="btn ghost" target="_blank" rel="noopener" href="'+waLink(o.l,"Hola "+o.l.name+", quedamos en que pagabas "+(o.p.d===today()?"hoy":"el "+F(o.p.d))+". Aquí ves tu préstamo: "+clientLink(o.id))+'">Recordar</a><button class="ghost" data-act="prom-done" data-id="'+o.id+'">Listo</button></div>').join(""):"");
+}
+function riskHtml(n,ced,self){
+  const k=norm2(n);let cnt=0,d=0,a=0;
+  Object.keys(L).forEach(id=>{const l=L[id];if(id===self)return;if((k&&norm2(l.name)===k)||(ced&&l.cedula&&String(l.cedula).trim()===String(ced).trim())){const c=calc(l);if(c.bal>0){cnt++;d+=c.bal;a+=Math.min(c.late,c.bal)}}});
+  return cnt?'<div class="note'+(a>0?" late":"")+'">⚠ Ya tiene '+cnt+(cnt==1?" préstamo":" préstamos")+" sin pagar: debe "+M(d)+(a>0?" y está atrasado "+M(a):"")+".</div>":"";
+}
+function totalInfo(l,d){const c=calc(l),cap=Math.max(0,(+l.principal||0)+c.g-c.paid),ip=Math.max(0,c.bal-cap),ds=ip*d/100;return{bal:c.bal,ip,ds,pagar:Math.max(0,c.bal-ds)}}
+function qHtml(l){
+  if(qm==="total"){const t=totalInfo(l,qd);return '<div class="cards" style="margin-top:8px"><div><span>Saldo hoy</span><b>'+M(t.bal)+'</b></div><div><span>Interés que falta</span><b>'+M(t.ip)+'</b></div></div><label style="margin-top:8px">Descuento sobre ese interés (%)<input id="q_d" type="number" inputmode="decimal" min="0" max="100" value="'+qd+'"></label><p class="sub">Si cancela hoy paga: <b id="q_tot">'+M(t.pagar)+'</b></p><button data-act="total-ok">Registrar pago total</button>'}
+  if(qm==="prom"){const t=new Date();t.setDate(t.getDate()+1);return '<div class="form">'+inp("p_d","¿Qué día prometió pagar?","date",(l.promesa&&l.promesa.d)||iso(t))+inp("p_n","Nota (opcional)","text",(l.promesa&&l.promesa.n)||"")+'<button data-act="prom-save">Guardar promesa</button></div>'}
+  return"";
+}
+function accionesHtml(l,c){
+  const pg=l.pagos.map(p=>"• "+F(p.d)+" — "+M(p.amt)).join("\n")||"• Aún no hay pagos";
+  const wa="📄 Estado de cuenta — "+l.name+"\nPrestado: "+M(l.principal)+" · "+l.cuotas+(l.cuotas==1?" cuota":" cuotas")+" de "+M(c.cuota)+"\n\nPagos:\n"+pg+"\n\nTotal pagado: "+M(c.paid)+"\nSaldo pendiente: "+M(Math.max(0,c.bal));
+  return '<div class="note"><b>Acciones rápidas</b><div class="bar" style="margin:8px 0 0">'+(l.tel?'<a class="btn" href="tel:'+esc(String(l.tel).replace(/[^\d+]/g,""))+'">📞 Llamar</a>':"")+(l.dir?'<a class="btn ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(l.dir)+'">📍 Mapa</a>':"")
+   +'<button class="ghost" data-act="estado">📄 Estado (Excel)</button><a class="btn ghost" target="_blank" rel="noopener" href="'+waLink(l,wa+"\n\nMira tu préstamo: "+clientLink(cur.id))+'">📲 Estado por WhatsApp</a>'+(c.bal>0?'<button class="ghost" data-act="total">💰 Cancelar hoy</button><button class="ghost" data-act="prom">🤝 Promesa de pago</button>':"")+"</div>"
+   +(l.dir?'<p class="sub">📍 '+esc(l.dir)+"</p>":"")+(l.promesa&&l.promesa.d?'<p class="sub">Promesa: '+F(l.promesa.d)+(l.promesa.n?" · "+esc(l.promesa.n):"")+"</p>":"")+qHtml(l)+"</div>";
+}
+function hojaEstado(l){const c=calc(l);return[{name:"Resumen",cols:[{h:"Concepto",w:28,t:"txt"},{h:"Valor",w:22,t:"money"}],rows:[["Cliente",["txt",l.name]],["Prestado",+l.principal||0],["Interés",Math.round(c.int)],["Gastos",c.g],["Pagado",c.paid],["Saldo pendiente",Math.round(c.bal)]]},{name:"Pagos",cols:[{h:"Fecha",w:15,t:"date"},{h:"Nota",w:28,t:"txt"},{h:"Monto",w:16,t:"money"}],rows:l.pagos.slice().sort((a,b)=>a.d<b.d?1:-1).map(x=>[x.d,x.n||"Pago",x.amt]),total:{sum:[2]}}]}
+
+// ---- calendario, papelera, historial, comprobantes ----
+function calBody(){
+  const t=new Date();t.setDate(1);t.setMonth(t.getMonth()+mesOff);
+  const Y=t.getFullYear(),Mo=t.getMonth(),ym=Y+"-"+pad(Mo+1),dim=new Date(Y,Mo+1,0).getDate(),fo=(new Date(Y,Mo,1).getDay()+6)%7,D={};
+  Object.keys(L).forEach(id=>{const l=L[id],c=calc(l);if(!l.start)return;sched(l,c).forEach(x=>{if(x.d.startsWith(ym)){const k=+x.d.slice(8);(D[k]=D[k]||[]).push({id,n:l.name,a:c.cuota,cov:x.cov,late:x.late})}})});
+  let g='<div class="cal">'+["L","M","M","J","V","S","D"].map(w=>"<b>"+w+"</b>").join("")+"<i></i>".repeat(fo);
+  for(let d=1;d<=dim;d++){const it=D[d]||[],k=ym+"-"+pad(d),col=!it.length?"":it.some(x=>x.late)?"#ff8a80":it.some(x=>!x.cov)?"var(--ac)":"var(--ok)";
+    g+='<button class="'+(calDay===k?"":"ghost")+(k===today()?" hoy":"")+'" data-act="cal" data-k="'+k+'">'+d+(it.length?'<u style="background:'+col+'"></u>':"")+"</button>"}
+  const sel=calDay.startsWith(ym)?(D[+calDay.slice(8)]||[]):[];
+  return '<div class="bar" style="justify-content:space-between;align-items:center;margin:4px 0"><button class="ghost" data-act="mes" data-d="-1" aria-label="Mes anterior">◀</button><b style="text-transform:capitalize">'+esc(t.toLocaleDateString("es-CO",{month:"long",year:"numeric"}))+'</b><button class="ghost" data-act="mes" data-d="1" aria-label="Mes siguiente">▶</button></div>'+g+'</div><p class="sub"><span class="late">●</span> atrasada · <span style="color:var(--ac)">●</span> pendiente · <span class="ok">●</span> pagada</p>'
+   +(calDay&&calDay.startsWith(ym)?"<h2>"+F(calDay)+"</h2>"+(sel.length?'<section class="cards" style="display:block">'+sel.map(i=>'<div class="sr"><span>'+esc(i.n)+"</span><span>"+M(i.a)+" · "+(i.cov?'<span class="ok">Pagada</span>':i.late?'<span class="late">Atrasada</span>':"Pendiente")+"</span></div>").join("")+"</section>":'<div class="empty">Nada para cobrar este día.</div>'):"");
+}
+function papeleraHtml(){
+  const ks=Object.keys(TR);if(!ks.length)return"";
+  return "<h2>Papelera ("+ks.length+')</h2><p class="sub">Préstamos eliminados. Puedes restaurarlos.</p>'+ks.map(id=>'<div class="row"><div>'+esc(TR[id].name)+"<br><small>Eliminado el "+F(iso(new Date(TR[id].borrado)))+'</small></div><div><button class="ghost" data-act="tr-rest" data-id="'+id+'">Restaurar</button> <button class="x" data-act="tr-del" data-id="'+id+'" aria-label="Eliminar para siempre">✕</button></div></div>').join("");
+}
+function logAuto(nw,old){
+  const h=(nw.hist=nw.hist||[]),add=x=>h.push({t:Date.now(),x}),sm=a=>a.reduce((t,x)=>t+x.amt,0);
+  if(!old)add("Creó el préstamo");
+  else{
+    const dp=sm(nw.pagos)-sm(old.pagos),dg=sm(nw.gastos)-sm(old.gastos);
+    if(nw.pagos.length>old.pagos.length)add("Pago registrado: "+M(dp));else if(nw.pagos.length<old.pagos.length)add("Pago eliminado: "+M(-dp));
+    if(nw.gastos.length>old.gastos.length)add("Gasto registrado: "+M(dg));else if(nw.gastos.length<old.gastos.length)add("Gasto eliminado: "+M(-dg));
+    if(["name","principal","rate","cuotas","dias","start","mora","tel","dir"].some(k=>String(nw[k]||"")!==String(old[k]||"")))add("Editó los datos del préstamo");
+    if(JSON.stringify(nw.promesa||null)!==JSON.stringify(old.promesa||null))add(nw.promesa?"Promesa de pago para el "+F(nw.promesa.d):"Promesa de pago cerrada");
+    if(!!nw.borrado!==!!old.borrado)add(nw.borrado?"Lo mandó a la papelera":"Lo restauró de la papelera");
+  }
+  if(h.length>100)h.splice(0,h.length-100);
+}
+function histHtml(l){const h=l.hist||[];if(!h.length)return"";return '<details class="pag"><summary>Historial de cambios ('+h.length+')<span class="more"></span></summary>'+h.slice().reverse().map(x=>'<div class="row"><div>'+esc(x.x)+"<br><small>"+new Date(x.t).toLocaleString("es-CO",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+"</small></div></div>").join("")+"</details>"}
+function cmpHtml(id){
+  const ks=Object.keys(CMP).filter(k=>CMP[k].loanId===id);if(!ks.length)return"";
+  return "<h2>Comprobantes enviados</h2>"+ks.map(k=>{const x=CMP[k];return '<div class="note cmp"><img src="'+x.img+'" alt="Comprobante"><br><small>'+F(x.d)+(x.monto?" · dice que pagó "+M(x.monto):"")+(x.nota?" · "+esc(x.nota):"")+'</small><div class="bar" style="margin:8px 0 0"><button data-act="cmp-ok" data-id="'+k+'">✓ Registrar pago</button><button class="ghost" data-act="cmp-no" data-id="'+k+'">Descartar</button></div></div>'}).join("");
+}
+function cmpBanner(){
+  const ks=Object.keys(CMP).filter(k=>L[CMP[k].loanId]);if(!ks.length)return"";
+  return "<h2>Comprobantes por revisar ("+ks.length+")</h2>"+ks.map(k=>'<button class="item" data-act="open" data-id="'+CMP[k].loanId+'"><span>📷 '+esc(L[CMP[k].loanId].name)+"<small>"+F(CMP[k].d)+"</small></span><b>"+(CMP[k].monto?M(CMP[k].monto):"Revisar")+"</b></button>").join("");
+}
+function cmpForm(){
+  if(cmpSent)return '<p class="sub ok">Comprobante enviado ✓ Tu prestamista lo va a revisar.</p>';
+  return '<div class="bar"><button class="ghost" data-act="cmp-open">📷 Enviar comprobante de pago</button></div>'+(cmpOpen?'<div class="form"><label>Foto del comprobante<input id="c_f" type="file" accept="image/*"></label><div id="c_prev"></div>'+inp("c_a","Monto que pagaste (COP)","number","",'inputmode="numeric"')+inp("c_n","Nota (opcional)","text","")+'<small id="c_m" class="late"></small><button data-act="cmp-send">Enviar</button></div>':"");
+}
 $.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act,v=id=>document.getElementById(id).value;
   if(a==="login"){b.disabled=true;try{await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"));locked=false}catch(x){askLogin("Correo o contraseña incorrectos.")}return}
@@ -666,6 +755,14 @@ $.addEventListener("click",async e=>{
   if(a==="install"&&deferredInstall){deferredInstall.prompt();deferredInstall=null;return view()}
   if(a==="zoom"){zoom=+b.dataset.i;return view()}
   if(a==="unzoom"){zoom=-1;return view()}
+  if(a==="cmp-open"){cmpOpen=!cmpOpen;cmpImg="";return view()}
+  if(a==="cmp-send"){
+    const m=document.getElementById("c_m");if(!cmpImg){m.textContent="Primero elige la foto del comprobante.";return}
+    b.disabled=true;
+    try{await setDoc(doc(db,"comprobantes",newId()),{loanId:cur.id,uid:cur.loan.uid||"",img:cmpImg,monto:+v("c_a")||0,nota:v("c_n").trim(),d:today(),creado:Date.now()});cmpSent=true;cmpOpen=false;cmpImg="";view()}
+    catch(x){b.disabled=false;m.textContent="No se pudo enviar ("+(x.code||"error")+"). Intenta de nuevo."}
+    return;
+  }
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
   if(a==="nav"){nav=b.dataset.t;showMas=nav==="mas";showNotif=false;scrollTo(0,0);return view()}
@@ -683,6 +780,24 @@ $.addEventListener("click",async e=>{
   if(a==="set-pin"){const p1=prompt("Escribe un PIN de 4 a 8 números");if(p1===null)return;if(!/^\d{4,8}$/.test(p1.trim())){err="El PIN debe tener entre 4 y 8 números.";showMas=true;return view()}const p2=prompt("Repite el PIN");if(p2===null)return;if(p1.trim()!==p2.trim()){err="Los PIN no coinciden.";showMas=true;return view()}pinHash=await sha(p1.trim());ls.set("cobros_pin",pinHash);showMas=true;return view()}
   if(a==="del-pin"){if(confirm("¿Quitar el PIN de bloqueo?")){pinHash="";locked=false;ls.del("cobros_pin");showMas=true;view()}return}
   if(a==="close-rec"){lastPay=null;return view()}
+  if(a==="cal"){calDay=b.dataset.k;return view()}
+  if(a==="tr-rest"){const id=b.dataset.id,l=structuredClone(TR[id]);delete l.borrado;try{await persist(id,l);RAW[id]=Object.assign({},RAW[id]||{});delete RAW[id].borrado;rebuild();return}catch(x){err="No se pudo restaurar ("+(x.code||"error")+")."}return view()}
+  if(a==="tr-del"){const id=b.dataset.id;if(!confirm("¿Eliminar para siempre? No se puede recuperar."))return;try{const bt=writeBatch(db);bt.delete(doc(db,"prestamos",id));if(P[id])bt.delete(doc(db,"privados",id));await race(bt.commit());delete RAW[id];rebuild();return}catch(x){err="No se pudo eliminar ("+(x.code||"error")+")."}return view()}
+  if(a==="cmp-no"){if(!confirm("¿Descartar este comprobante?"))return;try{await deleteDoc(doc(db,"comprobantes",b.dataset.id))}catch(x){err="No se pudo descartar ("+(x.code||"error")+")."}return view()}
+  if(a==="cmp-ok"){
+    const k=b.dataset.id,x=CMP[k];if(!x||!L[x.loanId])return;
+    const am=Math.round(+prompt("Monto del pago (COP)",x.monto||"")||0);if(!(am>0))return;
+    const l=structuredClone(L[x.loanId]);l.pagos.push({d:x.d||today(),amt:am,n:"Comprobante"});l.pagos.sort((p,q)=>p.d<q.d?-1:1);
+    b.disabled=true;
+    try{await persist(x.loanId,l);L[x.loanId]=l;RAW[x.loanId]=Object.assign({},RAW[x.loanId]||{},{pagos:l.pagos});await deleteDoc(doc(db,"comprobantes",k));lastPay={id:x.loanId,amt:am,d:x.d||today()}}catch(y){err="No se pudo registrar ("+(y.code||"error")+")."}
+    return view();
+  }
+  if(a==="tpl-save"){ls.set("cobros_tpl",JSON.stringify({am:v("t_am"),at:v("t_at"),fi:v("t_fi")}));showMas=true;return view()}
+  if(a==="tpl-reset"){ls.del("cobros_tpl");showMas=true;return view()}
+  if(a==="neg-meta"){const n=NEG();n.meta=+v("n_meta")||0;ls.set("cobros_neg",JSON.stringify(n));showMas=true;return view()}
+  if(a==="neg-gasto"){const n=NEG(),ds=v("n_d").trim(),am=+v("n_a");showMas=true;if(!ds||!(am>0)){err="Escribe la descripción y el monto del gasto.";return view()}n.g.push({d:today(),amt:am,desc:ds});ls.set("cobros_neg",JSON.stringify(n));return view()}
+  if(a==="neg-del"){const n=NEG();n.g.splice(+b.dataset.i,1);ls.set("cobros_neg",JSON.stringify(n));showMas=true;return view()}
+  if(a==="prom-done"){const id=b.dataset.id,l=structuredClone(L[id]);delete l.promesa;try{await persist(id,l);L[id]=l;RAW[id]=Object.assign({},RAW[id]||{})}catch(x){err="No se pudo ("+(x.code||"error")+")."}return view()}
   if(a==="tab"){tab=b.dataset.t;return view()}
   if(a==="pagar"){
     const id=b.dataset.id,amt=Math.round(+b.dataset.amt||0),l0=L[id];if(!l0||!(amt>0))return;
@@ -706,20 +821,24 @@ $.addEventListener("click",async e=>{
   if(a==="sem"){weekOff+=+b.dataset.d;return view()}
   if(a==="mes"){mesOff+=+b.dataset.d;return view()}
   if(a==="rm-foto"){fotosTmp.splice(+b.dataset.i,1);return prev()}
-  if(a==="open"){showNotif=false;cur={id:b.dataset.id,loan:L[b.dataset.id]};renewBal=0;form=null;askDel=false;zoom=-1;return view()}
-  if(a==="back"){cur=null;form=null;renewBal=0;return view()}
+  if(a==="open"){qm="";showNotif=false;cur={id:b.dataset.id,loan:L[b.dataset.id]};renewBal=0;form=null;askDel=false;zoom=-1;return view()}
+  if(a==="back"){qm="";cur=null;form=null;renewBal=0;return view()}
   if(a==="new"){cur={id:newId(),loan:norm(),draft:true};renewBal=0;form="setup";fotosTmp=[];return view()}
-  if(a==="renew"){const o=cur.loan,bal=calc(o).bal;renewBal=bal>0?bal:0;cur={id:newId(),loan:norm({name:o.name,cedula:o.cedula,tel:o.tel,fotos:[...(o.fotos||[])]}),draft:true};fotosTmp=[...(o.fotos||[])];form="setup";return view()}
+  if(a==="renew"){const o=cur.loan,bal=calc(o).bal;renewBal=bal>0?bal:0;cur={id:newId(),loan:norm({name:o.name,cedula:o.cedula,tel:o.tel,dir:o.dir,fotos:[...(o.fotos||[])]}),draft:true};fotosTmp=[...(o.fotos||[])];form="setup";return view()}
   if(a==="cancel"){form=null;renewBal=0;if(cur.draft)cur=null;return view()}
   if(a==="copy"){try{await navigator.clipboard.writeText(location.origin+location.pathname+"?c="+cur.id);b.textContent="¡Copiado!"}catch(x){b.textContent="Selecciona y copia el link"}return}
   if(["pago","gasto","setup"].includes(a)){form=a;if(a==="setup")fotosTmp=[...(cur.loan.fotos||[])];return view()}
   if(a==="ask-del"){askDel=true;return view()}
-  if(a==="del-loan"){try{const bt=writeBatch(db);bt.delete(doc(db,"prestamos",cur.id));if(P[cur.id])bt.delete(doc(db,"privados",cur.id));await race(bt.commit());delete L[cur.id];delete RAW[cur.id];cur=null}catch(x){err="No se pudo eliminar ("+(x.code||"error")+")."}askDel=false;return view()}
+  if(a==="del-loan"){const id=cur.id;try{const l=structuredClone(cur.loan);l.borrado=Date.now();await persist(id,l);RAW[id]=Object.assign({},RAW[id]||{},{borrado:l.borrado});cur=null;askDel=false;return rebuild()}catch(x){err="No se pudo eliminar ("+(x.code||"error")+")."}askDel=false;return view()}
+  if(a==="total"){qm=qm==="total"?"":"total";qd=0;return view()}
+  if(a==="prom"){qm=qm==="prom"?"":"prom";return view()}
+  if(a==="estado"){bajarXlsx("estado-"+cur.loan.name+"-"+today()+".xlsx",hojaEstado(cur.loan));return}
+  if(a==="refi"){const o=cur.loan,id0=cur.id,bal=Math.round(calc(o).bal);if(!(bal>0))return;renewBal=0;cur={id:newId(),refi:id0,loan:norm({name:o.name,cedula:o.cedula,tel:o.tel,dir:o.dir,principal:bal,fotos:[...(o.fotos||[])]}),draft:true};fotosTmp=[...(o.fotos||[])];form="setup";return view()}
   const l=structuredClone(cur.loan);
   if(a==="save-setup"){
     const n=v("f_n").trim(),p=+v("f_p"),r=+v("f_r"),w=+v("f_w"),k=+v("f_k"),d=v("f_d");
     if(!n||!(p>0)||!(w>0)||!(k>0)||!d||r<0){err="Completa nombre, monto, cuotas, días y fecha.";return view()}
-    Object.assign(l,{name:n,cedula:v("f_c").trim(),tel:v("f_tel").trim(),mora:+v("f_mora")||0,principal:p,rate:r,cuotas:w,dias:k,start:d,fotos:fotosTmp.slice()});
+    Object.assign(l,{name:n,cedula:v("f_c").trim(),tel:v("f_tel").trim(),dir:v("f_dir").trim(),mora:+v("f_mora")||0,principal:p,rate:r,cuotas:w,dias:k,start:d,fotos:fotosTmp.slice()});
     if(!l.uid)l.uid=auth.currentUser.uid;
     if(JSON.stringify(l).length>900000){err="Las fotos pesan demasiado. Quita alguna.";return view()}
   }else if(a==="save-pago"||a==="save-gasto"){
@@ -730,11 +849,21 @@ $.addEventListener("click",async e=>{
   }else if(a==="del-pago"||a==="del-gasto"){
     if(!confirm("¿Eliminar este registro?"))return;
     l[a==="del-pago"?"pagos":"gastos"].splice(+b.dataset.i,1);
+  }else if(a==="total-ok"){
+    const t=totalInfo(l,qd);if(!(t.pagar>0)&&!(t.ds>0))return;
+    if(t.pagar>0)l.pagos.push({d:today(),amt:Math.round(t.pagar),n:"Cancelación total"+(qd>0?" (desc. "+qd+"%)":"")});
+    if(t.ds>0)l.gastos.push({d:today(),amt:-Math.round(t.ds),desc:"Descuento por pago total"});
+    pendingRec={id:cur.id,amt:Math.round(t.pagar),d:today()};qm="";
+  }else if(a==="prom-save"){
+    const d=v("p_d");if(!d){err="Elige la fecha.";return view()}
+    l.promesa={d,n:v("p_n").trim()};qm="";
   }else return;
   b.disabled=true;await save(l);
+  if(a==="save-setup"&&!err&&cur&&cur.refi){const o=L[cur.refi];if(o){const ol=structuredClone(o),bl=calc(ol).bal;if(bl>0){ol.pagos.push({d:today(),amt:bl,n:"Refinanciado"});try{await persist(cur.refi,ol);L[cur.refi]=ol;RAW[cur.refi]=Object.assign({},RAW[cur.refi]||{},{pagos:ol.pagos})}catch(x){}}}delete cur.refi;view()}
   if(pendingRec){if(!err)lastPay=pendingRec;pendingRec=null;view()}
 });
 $.addEventListener("change",async e=>{
+  if(e.target.id==="c_f"){const f=e.target.files[0],m=document.getElementById("c_m"),pv=document.getElementById("c_prev");e.target.value="";if(!f)return;try{cmpImg=await shrink(f);pv.innerHTML='<img src="'+cmpImg+'" style="width:120px;height:120px;object-fit:cover;border-radius:10px" alt="Vista previa">';m.textContent=""}catch(x){cmpImg="";m.textContent="No se pudo leer la foto. Elígela desde la galería."}return}
   if(e.target.id!=="f_f")return;
   const fs=Array.from(e.target.files);e.target.value="";let bad=0,full=false;
   for(const f of fs){if(fotosTmp.length>=4){full=true;break}try{fotosTmp.push(await shrink(f))}catch(x){bad++}}
@@ -742,6 +871,8 @@ $.addEventListener("change",async e=>{
   if(m)m.textContent=full?"Máximo 4 fotos. Quita una (✕) para agregar otra.":bad?"No se pudo leer "+bad+" foto(s). Si la tomaste con la cámara, elígela desde la galería o toma la foto en formato JPG.":"";
 });
 $.addEventListener("input",e=>{
+  if(e.target.id==="f_n"||e.target.id==="f_c"){const o=document.getElementById("f_risk"),g=id=>(document.getElementById(id)||{value:""}).value.trim();if(o)o.innerHTML=riskHtml(g("f_n"),g("f_c"),cur&&cur.id);return}
+  if(e.target.id==="q_d"){qd=Math.min(100,Math.max(0,+e.target.value||0));const o=document.getElementById("q_tot");if(o&&cur)o.textContent=M(totalInfo(cur.loan,qd).pagar);return}
   if(e.target.id==="q_busca"){busca=e.target.value;const o=document.getElementById("lista");if(o)o.innerHTML=nav==="clientes"?clientesLista():listaHtml();return}
   if(["f_p","f_r","f_w","f_k","f_d"].includes(e.target.id)){
     const o=document.getElementById("f_sim"),g=id=>+(document.getElementById(id)||{}).value||0;
@@ -766,18 +897,19 @@ if(c){ // vista del cliente: solo lectura, sin sesión
     const lk=document.querySelector('link[rel="manifest"]');if(lk)lk.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:"application/manifest+json"}));
   }catch(x){}
   onSnapshot(doc(db,"prestamos",c),
-    s=>{if(s.exists()){cur={id:c,loan:norm(s.data())};view()}else $.innerHTML=msg("No encontramos este préstamo. Revisa el enlace.")},
+    s=>{if(s.exists()&&!s.data().borrado){cur={id:c,loan:norm(s.data())};view()}else $.innerHTML=msg("No encontramos este préstamo. Revisa el enlace.")},
     ()=>$.innerHTML=msg("No se pudo cargar. Intenta de nuevo."));
 }else if(rcode){registerFlow()}else startOwner();
 function startOwner(){
   onAuthStateChanged(auth,u=>{
-    if(unsub){unsub();unsub=null}if(unsub2){unsub2();unsub2=null}
+    if(unsub){unsub();unsub=null}if(unsub2){unsub2();unsub2=null}if(unsub3){unsub3();unsub3=null}CMP={};
     if(!u){owner=false;L={};RAW={};P={};privOK=null;migPriv=false;cur=null;form=null;lastPay=null;locked=!!pinHash;return askLogin()}
     owner=true;
     if(u.uid===ADMIN)migrar();
     unsub2=onSnapshot(query(collection(db,"privados"),where("uid","==",u.uid)),
       s=>{P={};s.forEach(d=>P[d.id]=d.data());privOK=true;rebuild()},
       ()=>{P={};privOK=false;rebuild()});
+    unsub3=onSnapshot(query(collection(db,"comprobantes"),where("uid","==",u.uid)),s=>{CMP={};s.forEach(d=>CMP[d.id]=d.data());if(!form)view()},()=>{});
     unsub=onSnapshot(query(collection(db,"prestamos"),where("uid","==",u.uid)),
       s=>{RAW={};s.forEach(d=>RAW[d.id]=d.data());rebuild()},
       e=>$.innerHTML=msg("No se pudo leer los datos ("+esc(e.code)+"). Revisa las reglas de Firestore."));
@@ -847,178 +979,4 @@ function ownerView(){
 function clientView(){
   if(!lend||R.querySelector(".xlend"))return;
   const h1=R.querySelector("h1");if(!h1||!(lend.nombre||lend.negocio))return;
-  let w=String(lend.wa||"").replace(/\D/g,"");if(w.length===10)w="57"+w;
-  const d=document.createElement("div");d.className="note xlend";
-  d.innerHTML='<div class="xav">'+(lend.foto?'<img src="'+esc(lend.foto)+'" alt="">':USER)+'</div><div><b>'+esc(lend.nombre||lend.negocio)+"</b>"
-   +(lend.nombre&&lend.negocio?"<br><small>"+esc(lend.negocio)+(lend.ciudad?" · "+esc(lend.ciudad):"")+"</small>":"")
-   +(lend.pago?"<br><small>Para pagar: "+esc(lend.pago)+"</small>":"")
-   +(w?'<br><a class="btn" style="margin-top:6px" target="_blank" rel="noopener" href="https://wa.me/'+w+"?text="+encodeURIComponent("Hola, te escribo por mi préstamo.")+'">Escribir por WhatsApp</a>':"")+"</div>";
-  h1.before(d);
-}
-function enhance(){
-  if(busy)return;busy=true;obs.disconnect();
-  try{clientView()}catch(x){}
-  obs.observe(R,{childList:true});busy=false;
-}
-
-const f=(id,l,v,x)=>'<label>'+l+'<input id="'+id+'" '+(x||'type="text"')+' value="'+esc(v||"")+'"></label>';
-function openPerfil(){
-  foto=perfil.foto||"";
-  lay.innerHTML='<div class="xsheet"><div class="xbk" data-x="close"></div><div class="xsc"><div class="xhd"><h1>Mi perfil</h1><button class="ghost" data-x="close">Cerrar</button></div><div class="form"><div id="xp_av" class="xav">'+(foto?'<img src="'+esc(foto)+'" alt="">':USER)+'</div><label>Foto de perfil<input id="xp_f" type="file" accept="image/*"></label>'
-   +f("xp_n","Tu nombre",perfil.nombre)+f("xp_neg","Nombre de tu negocio",perfil.negocio)+f("xp_ciu","Ciudad",perfil.ciudad)+f("xp_wa","Tu WhatsApp",perfil.wa,'type="tel" inputmode="tel"')+f("xp_pago","Cómo te pagan (Nequi, Daviplata, cuenta…)",perfil.pago)
-   +'<small id="xp_m" class="sub"></small><button data-x="guardar">Guardar perfil</button></div><p class="sub">Tus clientes ven esto en su link.</p><div class="bar"><button class="ghost" data-x="salir">Salir</button></div></div></div>';
-}
-const closePerfil=()=>{lay.innerHTML=""};
-async function avatar(file){
-  let bm=null,s,w,h;
-  for(const o of [{resizeWidth:600,resizeQuality:"medium"},{}]){try{bm=await createImageBitmap(file,o);break}catch(x){}}
-  if(bm){s=bm;w=bm.width;h=bm.height}
-  else{s=await new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=no;im.src=URL.createObjectURL(file)});w=s.naturalWidth;h=s.naturalHeight}
-  const m=Math.min(w,h),cv=document.createElement("canvas");cv.width=cv.height=256;
-  cv.getContext("2d").drawImage(s,(w-m)/2,(h-m)/2,m,m,0,0,256,256);
-  return cv.toDataURL("image/jpeg",.75);
-}
-
-document.addEventListener("click",async e=>{
-  const b=e.target.closest("[data-x]");if(!b)return;const a=b.dataset.x;
-  if(a==="eye"){e.preventDefault();hide=!hide;ls.set("cobros_hide",hide?"1":"0");return paintEye()}
-  if(a==="notif"){sheet="notif";const s=R.querySelector(".xsheet");if(s)s.hidden=false;return}
-  if(a==="perfil")return openPerfil();
-  if(a==="close"){sheet=null;const s=R.querySelector(".xsheet");if(s)s.hidden=true;return closePerfil()}
-  if(a==="salir"){closePerfil();return signOut(auth)}
-  if(a==="guardar"){
-    const g=id=>document.getElementById(id).value.trim(),m=document.getElementById("xp_m");
-    perfil={nombre:g("xp_n"),negocio:g("xp_neg"),ciudad:g("xp_ciu"),wa:g("xp_wa"),pago:g("xp_pago"),foto};
-    ls.set("cobros_perfil_"+uid,JSON.stringify(perfil));paintTop();dispatchEvent(new Event("perfil"));b.disabled=true;m.textContent="Guardando…";
-    try{await Promise.race([setDoc(doc(db,"perfiles",uid),perfil),new Promise((_,no)=>setTimeout(()=>no({code:"sin respuesta"}),6000))]);m.textContent="Perfil guardado ✓"}
-    catch(x){m.textContent="Se guardó en este celular, pero no se pudo publicar para tus clientes ("+(x.code||"error")+"). Falta actualizar las reglas de Firestore."}
-    b.disabled=false;
-  }
-});
-document.addEventListener("change",async e=>{
-  if(e.target.id!=="xp_f")return;
-  const file=e.target.files[0];e.target.value="";if(!file)return;
-  const av=document.getElementById("xp_av"),m=document.getElementById("xp_m");
-  try{foto=await avatar(file);av.innerHTML='<img src="'+esc(foto)+'" alt="">'}
-  catch(x){m.textContent="No se pudo leer la foto. Elígela desde la galería."}
-});
-document.addEventListener("visibilitychange",()=>{if(document.hidden)closePerfil()});
-
-onAuthStateChanged(auth,u=>{
-  uid=u?u.uid:null;perfil={};
-  if(u){
-    try{perfil=JSON.parse(ls.get("cobros_perfil_"+u.uid)||"{}")}catch(x){}
-    getDoc(doc(db,"perfiles",u.uid)).then(d=>{if(d.exists()){perfil=d.data();ls.set("cobros_perfil_"+u.uid,JSON.stringify(perfil));paintTop();dispatchEvent(new Event("perfil"))}}).catch(()=>{});
-  }else closePerfil();
-  paintTop();
-});
-const cid=new URLSearchParams(location.search).get("c");
-if(cid)getDoc(doc(db,"prestamos",cid)).then(s=>s.exists()&&s.data().uid?getDoc(doc(db,"perfiles",s.data().uid)):null).then(d=>{if(d&&d.exists()){lend=d.data();enhance()}}).catch(()=>{});
-obs.observe(R,{childList:true});enhance();
-</script>
-<script type="module">
-import {getApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,collection,doc,onSnapshot,query,where,updateDoc,deleteField} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const db=getFirestore(getApp()),auth=getAuth(getApp()),R=document.getElementById("root");
-const M=n=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n||0);
-const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const pad=n=>String(n).padStart(2,"0"),iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()),today=()=>iso(new Date());
-const F=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short",year:"numeric"}):"";
-const n2=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
-const hid=()=>{try{return localStorage.getItem("cobros_hide")==="1"}catch(x){return false}};
-const m=n=>hid()?"••••••":M(n);
-let LN={},unsub=null,busy=false;
-
-function calc(l){
-  const p=+l.principal||0,int=p*(+l.rate||0)/100,w=+l.cuotas||+l.weeks||1,per=+l.dias||7,cuota=(p+int)/w;
-  const g=(l.gastos||[]).reduce((s,x)=>s+x.amt,0),paid=(l.pagos||[]).reduce((s,x)=>s+x.amt,0);
-  const days=l.start?Math.floor((Date.now()-new Date(l.start+"T00:00"))/864e5):0,el=Math.max(0,Math.min(w,Math.floor(days/per)));
-  return{p,int,w,per,cuota,g,paid,late:Math.max(0,el*cuota+g-paid),bal:p+int+g-paid};
-}
-function dues(l,c){const o=[];if(!l.start)return o;for(let k=1;k<=c.w;k++){const d=new Date(l.start+"T00:00");d.setDate(d.getDate()+c.per*k);o.push({k,d:iso(d)})}return o}
-function waUrl(l,txt){let t=String(l.tel||"").replace(/\D/g,"");if(t.length===10)t="57"+t;return"https://wa.me/"+t+"?text="+encodeURIComponent(txt)}
-const link=id=>location.origin+location.pathname+"?c="+id;
-
-function caja(){
-  let cob=0,esp=0,falta=0;
-  Object.values(LN).forEach(l=>{const c=calc(l);
-    (l.pagos||[]).forEach(p=>{if(p.d===today())cob+=p.amt});
-    dues(l,c).forEach(x=>{if(x.d===today()){esp+=c.cuota;falta+=Math.max(0,Math.min(c.cuota,x.k*c.cuota-c.paid))}})});
-  return{cob,esp,falta};
-}
-const proms=()=>Object.keys(LN).filter(id=>{const p=LN[id].promesa;return p&&p.d&&p.d<=today()&&calc(LN[id]).bal>0})
-  .map(id=>({id,l:LN[id],p:LN[id].promesa})).sort((a,b)=>a.p.d<b.p.d?-1:1);
-
-function inicio(){
-  const t=R.querySelector(".tiles");if(!t)return;
-  const k=caja(),pr=proms(),box=document.createElement("div");box.className="xcj";
-  const tl=(a,b)=>'<div class="tl"><span>'+a+"</span><b>"+b+"</b></div>";
-  box.innerHTML='<h2>Cierre de caja de hoy</h2><section class="tiles">'+tl("Cobrado hoy",m(k.cob))+tl("Cuotas de hoy",m(k.esp))+tl("Falta cobrar hoy",m(k.falta))+tl("Promesas de pago",pr.length)+"</section>"
-   +(pr.length?"<h2>Prometieron pagar ("+pr.length+")</h2>"+pr.map(o=>'<div class="al"><button class="nm" data-act="open" data-id="'+o.id+'">'+esc(o.l.name)+"<br><small>"+(o.p.d===today()?"Prometió pagar hoy":'<span class="late">Prometió pagar el '+F(o.p.d)+"</span>")+(o.p.n?" · "+esc(o.p.n):"")+'</small></button><a class="btn ghost" target="_blank" rel="noopener" href="'+waUrl(o.l,"Hola "+o.l.name+", te recuerdo que quedamos en que ibas a pagar"+(o.p.d===today()?" hoy":" el "+F(o.p.d))+". Aquí ves tu préstamo: "+link(o.id))+'">Recordar</a><button class="ghost" data-y="pdone" data-id="'+o.id+'">Listo</button></div>').join(""):"");
-  t.after(box);
-}
-function detalle(){
-  const li=R.querySelector('input[readonly][value*="?c="]'),cp=R.querySelector('[data-act="copy"]'),bar=cp&&cp.closest(".bar");
-  if(!li||!bar)return;
-  const id=(li.value.split("?c=")[1]||"").split("&")[0],l=LN[id];if(!l)return;
-  const card=document.createElement("div");card.className="note xq";card.dataset.id=id;
-  card.innerHTML='<b>Acciones rápidas</b><div class="bar" style="margin:8px 0 0">'+(l.tel?'<a class="btn" href="tel:'+esc(String(l.tel).replace(/[^\d+]/g,""))+'">📞 Llamar</a>':"")
-   +'<button class="ghost" data-y="estado">📄 Estado de cuenta</button><button class="ghost" data-y="total">💰 Cancelar hoy</button><button class="ghost" data-y="prom">🤝 Promesa de pago</button></div>'
-   +(l.promesa&&l.promesa.d?'<p class="sub">Promesa guardada: '+F(l.promesa.d)+(l.promesa.n?" · "+esc(l.promesa.n):"")+"</p>":"")+'<div id="xq_out"></div>';
-  bar.after(card);
-}
-function risk(){
-  const h1=R.querySelector("h1"),n=R.querySelector("#f_n");
-  if(!n||!h1||h1.textContent!=="Nuevo préstamo")return;
-  let d=R.querySelector("#xrisk");if(!d){d=document.createElement("div");d.id="xrisk";n.closest("label").after(d)}
-  const k=n2(n.value);let deuda=0,atr=0,cnt=0;
-  if(k)Object.values(LN).forEach(l=>{if(n2(l.name)===k){const c=calc(l);if(c.bal>0){cnt++;deuda+=c.bal;atr+=Math.min(c.late,c.bal)}}});
-  d.innerHTML=cnt?'<div class="note'+(atr>0?" late":"")+'">⚠ '+esc(n.value.trim())+" ya tiene "+cnt+(cnt==1?" préstamo":" préstamos")+" sin pagar: debe "+M(deuda)+(atr>0?" y está atrasado "+M(atr):"")+".</div>":"";
-}
-function enhance(){
-  if(busy)return;busy=true;obs.disconnect();
-  try{R.querySelectorAll(".xcj,.xq").forEach(x=>x.remove());inicio();detalle();risk()}catch(x){}
-  obs.observe(R,{childList:true});busy=false;
-}
-const obs=new MutationObserver(()=>enhance());
-
-function totalHtml(l,d){
-  const c=calc(l),cap=Math.max(0,c.p+c.g-c.paid),ip=Math.max(0,c.bal-cap),desc=ip*(d/100),pagar=Math.max(0,c.bal-desc);
-  return '<div class="cards" style="margin-top:8px"><div><span>Saldo hoy</span><b>'+M(c.bal)+'</b></div><div><span>Interés que aún falta</span><b>'+M(ip)+'</b></div></div>'
-   +'<label style="margin-top:8px">Descuento sobre ese interés (%)<input id="xq_d" type="number" inputmode="decimal" min="0" max="100" value="'+d+'"></label>'
-   +'<p class="sub">Si cancela hoy paga: <b id="xq_tot">'+M(pagar)+"</b></p>";
-}
-document.addEventListener("click",async e=>{
-  const b=e.target.closest("[data-y]");if(!b)return;const a=b.dataset.y,card=b.closest(".xq"),id=b.dataset.id||(card&&card.dataset.id),l=LN[id];
-  if(!l)return;const out=document.getElementById("xq_out");
-  try{
-    if(a==="pdone"){await updateDoc(doc(db,"prestamos",id),{promesa:deleteField()});return}
-    if(a==="estado"){
-      const c=calc(l),pg=(l.pagos||[]).map(p=>"• "+F(p.d)+" — "+M(p.amt)).join("\n")||"• Aún no hay pagos";
-      return window.open(waUrl(l,"📄 Estado de cuenta — "+l.name+"\nPrestado: "+M(c.p)+" · "+c.w+(c.w==1?" cuota":" cuotas")+" de "+M(c.cuota)+"\n\nPagos:\n"+pg+"\n\nTotal pagado: "+M(c.paid)+"\nSaldo pendiente: "+M(Math.max(0,c.bal))+"\n\nMira tu préstamo aquí: "+link(id)),"_blank");
-    }
-    if(a==="total"){out.innerHTML=totalHtml(l,0);return}
-    if(a==="prom"){const t=new Date();t.setDate(t.getDate()+1);out.innerHTML='<div class="form"><label>¿Qué día prometió pagar?<input id="xp_d" type="date" value="'+iso(t)+'"></label><label>Nota (opcional)<input id="xp_n" type="text" placeholder="Ej: me paga el viernes"></label><button data-y="psave">Guardar promesa</button></div>';return}
-    if(a==="psave"){
-      const d=document.getElementById("xp_d").value;if(!d){out.insertAdjacentHTML("beforeend",'<div class="err">Elige la fecha.</div>');return}
-      b.disabled=true;await updateDoc(doc(db,"prestamos",id),{promesa:{d,n:document.getElementById("xp_n").value.trim(),at:Date.now()}});
-      out.innerHTML='<p class="sub ok">Promesa guardada ✓ Te aparece en Inicio ese día.</p>';
-    }
-  }catch(x){if(out)out.innerHTML='<div class="err">No se pudo ('+esc(x.code||"error")+").</div>"}
-});
-document.addEventListener("input",e=>{
-  if(e.target.id==="f_n")risk();
-  if(e.target.id==="xq_d"){
-    const card=e.target.closest(".xq"),l=card&&LN[card.dataset.id];if(!l)return;
-    const c=calc(l),cap=Math.max(0,c.p+c.g-c.paid),ip=Math.max(0,c.bal-cap),d=Math.min(100,Math.max(0,+e.target.value||0));
-    document.getElementById("xq_tot").textContent=M(Math.max(0,c.bal-ip*d/100));
-  }
-});
-onAuthStateChanged(auth,u=>{
-  if(unsub){unsub();unsub=null}LN={};
-  if(u)unsub=onSnapshot(query(collection(db,"prestamos"),where("uid","==",u.uid)),s=>{LN={};s.forEach(d=>LN[d.id]=d.data());enhance()},()=>{});
-});
-obs.observe(R,{childList:true});enhance();
-</script></body></html>
+  let w=String(lend.wa||"").r
