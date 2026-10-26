@@ -80,6 +80,18 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .tb.v th{background:#4f6228}.tb.v td,.tb.v tr:nth-child(odd) td{background:#ebf1de}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin:8px 0}.cal b{font-size:12px;color:var(--mut)}.cal button{padding:9px 0;position:relative}.cal button.hoy{border-color:var(--ac)}.cal u{position:absolute;left:50%;bottom:3px;width:6px;height:6px;border-radius:99px;transform:translateX(-50%)}
 .cmp img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--bd)}
+.xtop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}.xtop b{font-size:20px;text-align:center;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xib{width:46px;height:46px;padding:0;border-radius:99px;background:var(--card);border:1px solid var(--bd);color:var(--fg);display:grid;place-items:center;position:relative;overflow:hidden;flex:none}
+.xib img{width:100%;height:100%;object-fit:cover}.xib svg{width:24px;height:24px}
+.xdot{position:absolute;top:9px;right:10px;width:11px;height:11px;border-radius:99px;background:#ff6b81;border:2px solid var(--card)}
+.xeye{float:right;padding:2px 6px;background:transparent;color:var(--mut);border-radius:8px;line-height:0}.xeye svg{width:24px;height:24px;display:block}
+.xsheet{position:fixed;inset:0;z-index:20;display:flex;justify-content:center;align-items:flex-start;padding:calc(env(safe-area-inset-top) + 56px) 12px 12px}.xsheet[hidden]{display:none}
+.xbk{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+.xsc{position:relative;width:100%;max-width:536px;max-height:100%;overflow:auto;background:var(--bg);border:1px solid var(--bd);border-radius:16px;padding:12px 14px}
+.xhd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.xhd h1{margin:0;font-size:20px}
+.xav{width:92px;height:92px;border-radius:99px;overflow:hidden;border:1px solid var(--bd);background:var(--card);display:grid;place-items:center;color:var(--mut);flex:none}
+.xav img{width:100%;height:100%;object-fit:cover}.xav svg{width:46px;height:46px}
+.xlend{display:flex;gap:12px;align-items:center}.xlend .xav{width:56px;height:56px}.xlend .xav svg{width:28px;height:28px}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
@@ -130,7 +142,7 @@ let owner=false,L={},cur=null,form=null,err="",askDel=false,unsub=null,fotosTmp=
   RAW={},P={},privOK=null,unsub2=null,migPriv=false,lockErr="",hiddenAt=0;
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(x){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(x){}},del:k=>{try{localStorage.removeItem(k)}catch(x){}}};
 let pinHash=ls.get("cobros_pin")||"",locked=!!pinHash;
-let TR={},unsub3=null,CMP={},cmpOpen=false,cmpSent=false,cmpImg="",calDay="";
+let TR={},unsub3=null,CMP={},cmpOpen=false,cmpSent=false,cmpImg="",calDay="",calOff=0;
 let nav="inicio",filt="todos",showNotif=false,qm="",qd=0,ntab="rec",stBar="cob",stPie="est",hide=ls.get("cobros_hide")==="1";
 addEventListener("perfil",()=>{if(owner&&!cur&&!form&&!showNotif)view()});
 const sha=async t=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("cobros:"+t))),b=>b.toString(16).padStart(2,"0")).join("");
@@ -273,7 +285,7 @@ function simBody(){
 }
 function panelHtml(){
   const tb=(t,l)=>'<button class="'+(tab===t?"":"ghost")+'" data-act="tab" data-t="'+t+'">'+l+"</button>";
-  return '<section class="cards plan"><details class="big" id="pn"'+(showTabs?" open":"")+'><summary><b style="font-size:16px">Cobros y simulador</b><span class="more">Semana, mes y simulador</span></summary><div class="sch"><div class="tabs">'+tb("sem","Semana")+tb("mes","Mes")+tb("cal","Calendario")+tb("sim","Simulador")+"</div>"+(tab==="mes"?mesBody():tab==="sim"?simBody():tab==="cal"?calBody():semBody())+"</div></details></section>";
+  return '<section class="cards plan"><details class="big" id="pn"'+(showTabs?" open":"")+'><summary><b style="font-size:16px">Cobros y simulador</b><span class="more">Semana, mes y simulador</span></summary><div class="sch"><div class="tabs">'+tb("sem","Semana")+tb("mes","Mes")+tb("sim","Simulador")+"</div>"+(tab==="mes"?mesBody():tab==="sim"?simBody():semBody())+"</div></details></section>";
 }
 function resumenHtml(ids){
   const sum=f=>ids.reduce((x,id)=>x+f(L[id]),0),m=n=>hide?"••••••":M(n);
@@ -459,7 +471,7 @@ function view(){
   if(owner&&!cur){
     const ids=Object.keys(L);
     let h=topHtml(nCount(ids)+Object.keys(CMP).length)+reciboHtml();
-    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?statsHtml(ids)+negHtml()+papeleraHtml()+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
+    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?statsHtml(ids)+calHtml()+negHtml()+papeleraHtml()+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
     return $.innerHTML=h+(err?'<div class="err">'+esc(err)+"</div>":"")+navHtml()+sheetHtml(ids);
   }
   const l=cur.loan,c=calc(l);let h="";
@@ -688,18 +700,19 @@ function accionesHtml(l,c){
 }
 function hojaEstado(l){const c=calc(l);return[{name:"Resumen",cols:[{h:"Concepto",w:28,t:"txt"},{h:"Valor",w:22,t:"money"}],rows:[["Cliente",["txt",l.name]],["Prestado",+l.principal||0],["Interés",Math.round(c.int)],["Gastos",c.g],["Pagado",c.paid],["Saldo pendiente",Math.round(c.bal)]]},{name:"Pagos",cols:[{h:"Fecha",w:15,t:"date"},{h:"Nota",w:28,t:"txt"},{h:"Monto",w:16,t:"money"}],rows:l.pagos.slice().sort((a,b)=>a.d<b.d?1:-1).map(x=>[x.d,x.n||"Pago",x.amt]),total:{sum:[2]}}]}
 
-// ---- calendario, papelera, historial, comprobantes ----
+// ---- calendario (sección propia en Más), papelera, historial, comprobantes ----
 function calBody(){
-  const t=new Date();t.setDate(1);t.setMonth(t.getMonth()+mesOff);
+  const t=new Date();t.setDate(1);t.setMonth(t.getMonth()+calOff);
   const Y=t.getFullYear(),Mo=t.getMonth(),ym=Y+"-"+pad(Mo+1),dim=new Date(Y,Mo+1,0).getDate(),fo=(new Date(Y,Mo,1).getDay()+6)%7,D={};
   Object.keys(L).forEach(id=>{const l=L[id],c=calc(l);if(!l.start)return;sched(l,c).forEach(x=>{if(x.d.startsWith(ym)){const k=+x.d.slice(8);(D[k]=D[k]||[]).push({id,n:l.name,a:c.cuota,cov:x.cov,late:x.late})}})});
   let g='<div class="cal">'+["L","M","M","J","V","S","D"].map(w=>"<b>"+w+"</b>").join("")+"<i></i>".repeat(fo);
   for(let d=1;d<=dim;d++){const it=D[d]||[],k=ym+"-"+pad(d),col=!it.length?"":it.some(x=>x.late)?"#ff8a80":it.some(x=>!x.cov)?"var(--ac)":"var(--ok)";
     g+='<button class="'+(calDay===k?"":"ghost")+(k===today()?" hoy":"")+'" data-act="cal" data-k="'+k+'">'+d+(it.length?'<u style="background:'+col+'"></u>':"")+"</button>"}
   const sel=calDay.startsWith(ym)?(D[+calDay.slice(8)]||[]):[];
-  return '<div class="bar" style="justify-content:space-between;align-items:center;margin:4px 0"><button class="ghost" data-act="mes" data-d="-1" aria-label="Mes anterior">◀</button><b style="text-transform:capitalize">'+esc(t.toLocaleDateString("es-CO",{month:"long",year:"numeric"}))+'</b><button class="ghost" data-act="mes" data-d="1" aria-label="Mes siguiente">▶</button></div>'+g+'</div><p class="sub"><span class="late">●</span> atrasada · <span style="color:var(--ac)">●</span> pendiente · <span class="ok">●</span> pagada</p>'
+  return '<div class="bar" style="justify-content:space-between;align-items:center;margin:4px 0"><button class="ghost" data-act="cal-mes" data-d="-1" aria-label="Mes anterior">◀</button><b style="text-transform:capitalize">'+esc(t.toLocaleDateString("es-CO",{month:"long",year:"numeric"}))+'</b><button class="ghost" data-act="cal-mes" data-d="1" aria-label="Mes siguiente">▶</button></div>'+g+'</div><p class="sub"><span class="late">●</span> atrasada · <span style="color:var(--ac)">●</span> pendiente · <span class="ok">●</span> pagada</p>'
    +(calDay&&calDay.startsWith(ym)?"<h2>"+F(calDay)+"</h2>"+(sel.length?'<section class="cards" style="display:block">'+sel.map(i=>'<div class="sr"><span>'+esc(i.n)+"</span><span>"+M(i.a)+" · "+(i.cov?'<span class="ok">Pagada</span>':i.late?'<span class="late">Atrasada</span>':"Pendiente")+"</span></div>").join("")+"</section>":'<div class="empty">Nada para cobrar este día.</div>'):"");
 }
+function calHtml(){return '<h2>Calendario 📅</h2><div class="chc">'+calBody()+"</div>"}
 function papeleraHtml(){
   const ks=Object.keys(TR);if(!ks.length)return"";
   return "<h2>Papelera ("+ks.length+')</h2><p class="sub">Préstamos eliminados. Puedes restaurarlos.</p>'+ks.map(id=>'<div class="row"><div>'+esc(TR[id].name)+"<br><small>Eliminado el "+F(iso(new Date(TR[id].borrado)))+'</small></div><div><button class="ghost" data-act="tr-rest" data-id="'+id+'">Restaurar</button> <button class="x" data-act="tr-del" data-id="'+id+'" aria-label="Eliminar para siempre">✕</button></div></div>').join("");
@@ -781,6 +794,7 @@ $.addEventListener("click",async e=>{
   if(a==="del-pin"){if(confirm("¿Quitar el PIN de bloqueo?")){pinHash="";locked=false;ls.del("cobros_pin");showMas=true;view()}return}
   if(a==="close-rec"){lastPay=null;return view()}
   if(a==="cal"){calDay=b.dataset.k;return view()}
+  if(a==="cal-mes"){calOff+=+b.dataset.d;return view()}
   if(a==="tr-rest"){const id=b.dataset.id,l=structuredClone(TR[id]);delete l.borrado;try{await persist(id,l);RAW[id]=Object.assign({},RAW[id]||{});delete RAW[id].borrado;rebuild();return}catch(x){err="No se pudo restaurar ("+(x.code||"error")+")."}return view()}
   if(a==="tr-del"){const id=b.dataset.id;if(!confirm("¿Eliminar para siempre? No se puede recuperar."))return;try{const bt=writeBatch(db);bt.delete(doc(db,"prestamos",id));if(P[id])bt.delete(doc(db,"privados",id));await race(bt.commit());delete RAW[id];rebuild();return}catch(x){err="No se pudo eliminar ("+(x.code||"error")+")."}return view()}
   if(a==="cmp-no"){if(!confirm("¿Descartar este comprobante?"))return;try{await deleteDoc(doc(db,"comprobantes",b.dataset.id))}catch(x){err="No se pudo descartar ("+(x.code||"error")+")."}return view()}
@@ -930,20 +944,7 @@ const BELL=S('<path d="M6 17v-6a6 6 0 0 1 12 0v6M4 17h16M10 20.5h4"/>');
 const EYE=S('<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>');
 const EYEC=S('<path d="M3 11c2.5 3.5 6 5 9 5s6.5-1.5 9-5M6 14.5 4 17M12 16v3M18 14.5l2 2.5"/>');
 
-const st=document.createElement("style");
-st.textContent=`.xtop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}.xtop b{font-size:20px;text-align:center;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.xib{width:46px;height:46px;padding:0;border-radius:99px;background:var(--card);border:1px solid var(--bd);color:var(--fg);display:grid;place-items:center;position:relative;overflow:hidden}
-.xib img{width:100%;height:100%;object-fit:cover}.xib svg{width:24px;height:24px}
-.xdot{position:absolute;top:9px;right:10px;width:11px;height:11px;border-radius:99px;background:#ff6b81;border:2px solid var(--card)}
-.xeye{float:right;padding:2px 6px;background:transparent;color:var(--mut);border-radius:8px}.xeye svg{width:24px;height:24px;display:block}
-.xsheet{position:fixed;inset:0;z-index:20;display:flex;justify-content:center;align-items:flex-start;padding:calc(env(safe-area-inset-top) + 56px) 12px 12px}.xsheet[hidden]{display:none}
-.xbk{position:absolute;inset:0;background:rgba(0,0,0,.6)}
-.xsc{position:relative;width:100%;max-width:536px;max-height:100%;overflow:auto;background:var(--bg);border:1px solid var(--bd);border-radius:16px;padding:12px 14px}
-.xhd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.xhd h1{margin:0;font-size:20px}
-.xav{width:92px;height:92px;border-radius:99px;overflow:hidden;border:1px solid var(--bd);background:var(--card);display:grid;place-items:center;color:var(--mut);flex:none}
-.xav img{width:100%;height:100%;object-fit:cover}.xav svg{width:46px;height:46px}
-.xlend{display:flex;gap:12px;align-items:center}.xlend .xav{width:56px;height:56px}.xlend .xav svg{width:28px;height:28px}`;
-document.head.append(st);
+
 
 let uid=null,perfil={},hide=ls.get("cobros_hide")==="1",sheet=null,foto="",lend=null,busy=false;
 const lay=document.createElement("div");document.body.append(lay);
@@ -978,5 +979,4 @@ function ownerView(){
 }
 function clientView(){
   if(!lend||R.querySelector(".xlend"))return;
-  const h1=R.querySelector("h1");if(!h1||!(lend.nombre||lend.negocio))return;
-  let w=String(lend.wa||"").r
+  const h1=R.query
