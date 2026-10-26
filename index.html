@@ -146,6 +146,8 @@ let db;try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManag
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 
 const $=document.getElementById("root"),q=new URLSearchParams(location.search);
+window.addEventListener("unhandledrejection",e=>{console.error("COBROS async error:",e.reason)});
+window.addEventListener("error",e=>{console.error("COBROS script error:",e.message)});
 const M=n=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(n||0);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const F=d=>d?new Date(d+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short",year:"numeric"}):"";
@@ -406,7 +408,7 @@ function masHtml(){
    +'<div class="bar"><button class="ghost" data-act="set-pin">'+(pinHash?"Cambiar PIN":"Poner PIN de bloqueo")+"</button>"+(pinHash?'<button class="ghost" data-act="del-pin">Quitar PIN</button>':"")+(bioCredential?'<button class="ghost" data-act="del-bio">Desactivar huella</button>':'<button class="ghost" data-act="set-bio">Activar huella</button>')+"</div>"+(avisosOK()?'<div class="bar">'+(ls.get("cobros_push_owner")?'<span class="ok">🔔 Avisos activados en este celular ✓</span>':'<button class="ghost" data-act="push-owner">🔔 Activar avisos en este celular</button>')+"</div>":"")+tplBox()+invBox()+"</details>";
 }
 function lockHtml(){
-  return '<h1>Entrar a COBROS</h1><p class="sub">Confirma tu identidad para acceder a tus préstamos y cobros.</p><div class="form">'+(bioCredential?'<button data-act="unlock-bio" style="width:100%;background:linear-gradient(135deg,#efff00,#c9d900);color:#111;border:0;font-weight:800;border-radius:14px;padding:15px 16px;font-size:16px">◎ &nbsp; Entrar con huella</button>':'')+(pinHash?'<label>PIN<input id="f_pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>':'')+(lockErr?'<div class="err">'+esc(lockErr)+"</div>":"")+(pinHash?'<button data-act="unlock">Entrar con PIN</button>':'')+'<button class="ghost" data-act="forgot-pin">Volver a iniciar sesión</button></div>';
+  return '<h1>Entrar a COBROS</h1><p class="sub">Confirma tu identidad para acceder a tus préstamos y cobros.</p><div class="form">'+(bioCredential?'<button data-act="unlock-bio" style="width:100%;background:linear-gradient(135deg,#efff00,#c9d900);color:#111;border:0;font-weight:800;border-radius:14px;padding:15px 16px;font-size:16px">◎ &nbsp; Entrar con huella</button>':'')+(pinHash?'<label>PIN<input id="f_pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>':'')+(lockErr?'<div class="err">'+esc(lockErr)+"</div>":"")+(pinHash?'<button data-act="unlock">Entrar con PIN</button>':'')+'<button class="ghost" data-act="back-login">Volver a iniciar sesión</button></div>';
 }
 function cumpl(arr){
   let ok=0,tarde=0,pend=0,sd=0;
@@ -858,7 +860,32 @@ $.addEventListener("click",async e=>{
     if(!rcode)return askLogin("Para crear una cuenta necesitas abrir un enlace de invitación del administrador.");
     return registerFlow();
   }
-  if(a==="login"){b.disabled=true;try{bioGatePassed=true;await signInWithEmailAndPassword(auth,v("f_e").trim(),v("f_pw"));locked=false}catch(x){bioGatePassed=false;askLogin("Correo o contraseña incorrectos.")}return}
+  if(a==="login"){
+    e.preventDefault();
+    const emailEl=document.getElementById("f_e"),passEl=document.getElementById("f_pw");
+    const email=emailEl?emailEl.value.trim():"",password=passEl?passEl.value:"";
+    if(!email||!password){askLogin("Escribe tu correo electrónico y contraseña.");return}
+    b.disabled=true;b.textContent="CONECTANDO…";
+    try{
+      bioGatePassed=true;
+      await Promise.race([
+        signInWithEmailAndPassword(auth,email,password),
+        new Promise((_,reject)=>setTimeout(()=>reject(Object.assign(new Error("La conexión está tardando. Revisa internet e inténtalo otra vez."),{code:"app/timeout"})),15000))
+      ]);
+      locked=false;
+    }catch(x){
+      bioGatePassed=false;
+      const code=x&&x.code||"";
+      let message="No se pudo iniciar sesión"+(code?" ("+code+")":"")+". Revisa tu conexión y la configuración de Firebase Authentication.";
+      if(code==="auth/invalid-credential"||code==="auth/wrong-password"||code==="auth/user-not-found")message="El correo o la contraseña no son correctos.";
+      else if(code==="auth/invalid-email")message="El correo no tiene un formato válido.";
+      else if(code==="auth/too-many-requests")message="Hubo demasiados intentos. Espera un momento y vuelve a probar.";
+      else if(code==="auth/network-request-failed")message="No hay conexión con Firebase. Revisa internet y vuelve a intentarlo.";
+      else if(code==="app/timeout")message=x.message;
+      askLogin(message);
+    }
+    return;
+  }
   if(a==="recover-password"){
     const em=v("f_e").trim();if(!em){askRecovery("Escribe tu correo para enviarte el enlace de recuperación.");return}
     b.disabled=true;try{await sendPasswordResetEmail(auth,em);askRecovery("Si existe una cuenta con ese correo, recibirás un enlace. Revisa también spam.")}
