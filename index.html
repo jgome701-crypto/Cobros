@@ -503,7 +503,7 @@ const SV=d=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 const IUSER=SV('<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>'),IBELL=SV('<path d="M6 17v-6a6 6 0 0 1 12 0v6M4 17h16M10 20.5h4"/>'),IEYE=SV('<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),IEYEC=SV('<path d="M3 11c2.5 3.5 6 5 9 5s6.5-1.5 9-5M6 14.5 4 17M12 16v3M18 14.5l2 2.5"/>');
 const PF=()=>{try{return JSON.parse(ls.get("cobros_perfil_"+(auth.currentUser&&auth.currentUser.uid))||"{}")}catch(x){return{}}};
 const nCount=ids=>ids.filter(id=>{const c=calc(L[id]);if(c.bal<=0)return false;const d=dueInfo(L[id],c);return d.late||d.hoy}).length;
-function topHtml(n){const p=PF();return '<div class="xtop"><button class="xib" data-act="nav" data-t="mas" aria-label="Mi perfil">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':IUSER)+'</button><b>'+esc(p.negocio||"Cobros")+'</b><button class="xib" data-act="notif" aria-label="Notificaciones'+(n?" ("+n+")":"")+'">'+IBELL+(n?'<i class="xdot"></i>':"")+"</button></div>"}
+function topHtml(n){const p=PF();return '<div class="xtop"><button class="xib" data-act="perfil" aria-label="Mi perfil">'+(p.foto?'<img src="'+esc(p.foto)+'" alt="">':IUSER)+'</button><b>'+esc(p.negocio||"Cobros")+'</b><button class="xib" data-act="notif" aria-label="Notificaciones'+(n?" ("+n+")":"")+'">'+IBELL+(n?'<i class="xdot"></i>':"")+"</button></div>"}
 function navHtml(){
   const t=(k,l,d)=>'<button class="'+(nav===k?"on":"")+'" data-act="nav" data-t="'+k+'">'+SV(d)+l+"</button>";
   return '<nav class="nav">'+t("inicio","Inicio",'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>')+t("cobros","Cobros",'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>')+'<button class="plus" data-act="new" aria-label="Nuevo préstamo">＋</button>'+t("clientes","Clientes",'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>')+t("mas","Más",'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>')+"</nav>";
@@ -585,8 +585,8 @@ function view(){
   if(owner&&locked&&(pinHash||bioCredential))return $.innerHTML=lockHtml();
   if(owner&&!cur){
     const ids=Object.keys(L);
-    let h=(nav==="mas"?"":topHtml(nCount(ids)+Object.keys(CMP).length))+tutHtml()+(!navigator.onLine?'<div class="note late">Sin internet: puedes registrar pagos. Quedarán pendientes de sincronización.</div>':(getPayQueue().length?'<div class="note">Pagos pendientes de sincronizar: <b>'+getPayQueue().length+'</b></div>':""))+reciboHtml();
-    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="mas"?masScreen(ids):inicioHtml(ids);
+    let h=(nav==="perfil"?"":topHtml(nCount(ids)+Object.keys(CMP).length))+tutHtml()+(!navigator.onLine?'<div class="note late">Sin internet: puedes registrar pagos. Quedarán pendientes de sincronización.</div>':(getPayQueue().length?'<div class="note">Pagos pendientes de sincronizar: <b>'+getPayQueue().length+'</b></div>':""))+reciboHtml();
+    h+=nav==="cobros"?cobrosHtml():nav==="clientes"?clientesHtml():nav==="perfil"?masScreen(ids):nav==="mas"?statsHtml(ids)+calHtml()+negHtml()+binCard()+masHtml()+'<div class="bar"><button class="ghost" data-act="logout">Salir</button></div>':inicioHtml(ids);
     return $.innerHTML=h+(err?'<div class="err">'+esc(err)+"</div>":"")+navHtml()+sheetHtml(ids)+trashSheet();
   }
   const l=cur.loan,c=calc(l);let h="";
@@ -968,7 +968,7 @@ async function savePerfil(p){
 function perfilHub(){
   const p=PF(),u=auth.currentUser,since=u&&u.metadata&&u.metadata.creationTime?F(iso(new Date(u.metadata.creationTime))):"";
   return '<div class="mtop"><div class="mbrand"><span class="crown">'+SV(ICO.crown)+"</span><b>COBROS</b><small>Tu aliado en cada préstamo</small></div>"
-   +'<button class="xib" data-act="mv" data-v="tools" aria-label="Herramientas">'+SV(ICO.gear)+"</button></div>"
+   +'<button class="xib" data-act="nav" data-t="mas" aria-label="Estadísticas y herramientas">'+SV(ICO.gear)+"</button></div>"
    +'<section class="pcard"><div class="prow">'+pavHtml(p)+'<div><b class="pn">'+esc(p.nombre||p.negocio||"Tu nombre")+'</b><span class="badge">Cuenta activa</span><small>'+(p.ciudad?SV(ICO.pin)+esc(p.ciudad):"Agrega tu ciudad en Mis datos")+"</small></div></div>"
    +'<div class="pmeta"><div>'+SV(ICO.user)+"<span><small>Usuario desde</small><b>"+esc(since||"—")+"</b></span></div><div>"+SV(ICO.chat)+"<span><small>WhatsApp</small><b>"+esc(p.wa||"Sin agregar")+"</b></span></div></div></section>"
    +'<section class="mlist">'+mrow("user","Mis datos","Información personal","mv",' data-v="datos"')+mrow("card","Método de pago","Gestiona tus métodos de pago","mv",' data-v="pago"')+mrow("shield","Seguridad","Protege tu cuenta","mv",' data-v="seg"')+mrow("bell","Notificaciones","Configura tus alertas","mv",' data-v="notif"')+mrow("doc","Términos y privacidad","Información legal","mv",' data-v="terms"')+"</section>"
@@ -1083,6 +1083,7 @@ $.addEventListener("click",async e=>{
   if(a==="logout")return signOut(auth);
   if(a==="nav"){mv="";nav=b.dataset.t;showMas=nav==="mas";showNotif=false;scrollTo(0,0);return view()}
   if(a==="notif"){showNotif=true;return view()}
+  if(a==="perfil"){nav="perfil";mv="";datosEdit=false;showNotif=false;scrollTo(0,0);return view()}
   if(a==="mv"){mv=b.dataset.v;datosEdit=false;scrollTo(0,0);return view()}
   if(a==="trash"){trashOpen=true;return view()}
   if(a==="trash-close"){trashOpen=false;return view()}
