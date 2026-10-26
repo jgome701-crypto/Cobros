@@ -694,7 +694,7 @@ function qHtml(l){
 function accionesHtml(l,c){
   const pg=l.pagos.map(p=>"• "+F(p.d)+" — "+M(p.amt)).join("\n")||"• Aún no hay pagos";
   const wa="📄 Estado de cuenta — "+l.name+"\nPrestado: "+M(l.principal)+" · "+l.cuotas+(l.cuotas==1?" cuota":" cuotas")+" de "+M(c.cuota)+"\n\nPagos:\n"+pg+"\n\nTotal pagado: "+M(c.paid)+"\nSaldo pendiente: "+M(Math.max(0,c.bal));
-  return '<div class="note"><b>Acciones rápidas</b><div class="bar" style="margin:8px 0 0">'+(l.tel?'<a class="btn" href="tel:'+esc(String(l.tel).replace(/[^\d+]/g,""))+'">📞 Llamar</a>':"")+(l.dir?'<a class="btn ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(l.dir)+'">📍 Mapa</a>':"")
+  return '<div class="note"><b>Acciones rápidas</b><div class="bar" style="margin:8px 0 0">'+(l.tel?'<a class="btn" href="tel:'+esc(String(l.tel).replace(/[^\d+]/g,""))+'">📞 Llamar</a>':"")+(l.dir?'<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(l.dir+(PF().ciudad?", "+PF().ciudad:""))+'">🧭 Cómo llegar</a><a class="btn ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(l.dir+(PF().ciudad?", "+PF().ciudad:""))+'">📍 Mapa</a>':"")
    +'<button class="ghost" data-act="estado">📄 Estado (Excel)</button><a class="btn ghost" target="_blank" rel="noopener" href="'+waLink(l,wa+"\n\nMira tu préstamo: "+clientLink(cur.id))+'">📲 Estado por WhatsApp</a>'+(c.bal>0?'<button class="ghost" data-act="total">💰 Cancelar hoy</button><button class="ghost" data-act="prom">🤝 Promesa de pago</button>':"")+"</div>"
    +(l.dir?'<p class="sub">📍 '+esc(l.dir)+"</p>":"")+(l.promesa&&l.promesa.d?'<p class="sub">Promesa: '+F(l.promesa.d)+(l.promesa.n?" · "+esc(l.promesa.n):"")+"</p>":"")+qHtml(l)+"</div>";
 }
@@ -979,4 +979,72 @@ function ownerView(){
 }
 function clientView(){
   if(!lend||R.querySelector(".xlend"))return;
-  const h1=R.query
+  const h1=R.querySelector("h1");if(!h1||!(lend.nombre||lend.negocio))return;
+  let w=String(lend.wa||"").replace(/\D/g,"");if(w.length===10)w="57"+w;
+  const d=document.createElement("div");d.className="note xlend";
+  d.innerHTML='<div class="xav">'+(lend.foto?'<img src="'+esc(lend.foto)+'" alt="">':USER)+'</div><div><b>'+esc(lend.nombre||lend.negocio)+"</b>"
+   +(lend.nombre&&lend.negocio?"<br><small>"+esc(lend.negocio)+(lend.ciudad?" · "+esc(lend.ciudad):"")+"</small>":"")
+   +(lend.pago?"<br><small>Para pagar: "+esc(lend.pago)+"</small>":"")
+   +(w?'<br><a class="btn" style="margin-top:6px" target="_blank" rel="noopener" href="https://wa.me/'+w+"?text="+encodeURIComponent("Hola, te escribo por mi préstamo.")+'">Escribir por WhatsApp</a>':"")+"</div>";
+  h1.before(d);
+}
+function enhance(){
+  if(busy)return;busy=true;obs.disconnect();
+  try{clientView()}catch(x){}
+  obs.observe(R,{childList:true});busy=false;
+}
+
+const f=(id,l,v,x)=>'<label>'+l+'<input id="'+id+'" '+(x||'type="text"')+' value="'+esc(v||"")+'"></label>';
+function openPerfil(){
+  foto=perfil.foto||"";
+  lay.innerHTML='<div class="xsheet"><div class="xbk" data-x="close"></div><div class="xsc"><div class="xhd"><h1>Mi perfil</h1><button class="ghost" data-x="close">Cerrar</button></div><div class="form"><div id="xp_av" class="xav">'+(foto?'<img src="'+esc(foto)+'" alt="">':USER)+'</div><label>Foto de perfil<input id="xp_f" type="file" accept="image/*"></label>'
+   +f("xp_n","Tu nombre",perfil.nombre)+f("xp_neg","Nombre de tu negocio",perfil.negocio)+f("xp_ciu","Ciudad",perfil.ciudad)+f("xp_wa","Tu WhatsApp",perfil.wa,'type="tel" inputmode="tel"')+f("xp_pago","Cómo te pagan (Nequi, Daviplata, cuenta…)",perfil.pago)
+   +'<small id="xp_m" class="sub"></small><button data-x="guardar">Guardar perfil</button></div><p class="sub">Tus clientes ven esto en su link.</p><div class="bar"><button class="ghost" data-x="salir">Salir</button></div></div></div>';
+}
+const closePerfil=()=>{lay.innerHTML=""};
+async function avatar(file){
+  let bm=null,s,w,h;
+  for(const o of [{resizeWidth:600,resizeQuality:"medium"},{}]){try{bm=await createImageBitmap(file,o);break}catch(x){}}
+  if(bm){s=bm;w=bm.width;h=bm.height}
+  else{s=await new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=no;im.src=URL.createObjectURL(file)});w=s.naturalWidth;h=s.naturalHeight}
+  const m=Math.min(w,h),cv=document.createElement("canvas");cv.width=cv.height=256;
+  cv.getContext("2d").drawImage(s,(w-m)/2,(h-m)/2,m,m,0,0,256,256);
+  return cv.toDataURL("image/jpeg",.75);
+}
+
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-x]");if(!b)return;const a=b.dataset.x;
+  if(a==="eye"){e.preventDefault();hide=!hide;ls.set("cobros_hide",hide?"1":"0");return paintEye()}
+  if(a==="notif"){sheet="notif";const s=R.querySelector(".xsheet");if(s)s.hidden=false;return}
+  if(a==="perfil")return openPerfil();
+  if(a==="close"){sheet=null;const s=R.querySelector(".xsheet");if(s)s.hidden=true;return closePerfil()}
+  if(a==="salir"){closePerfil();return signOut(auth)}
+  if(a==="guardar"){
+    const g=id=>document.getElementById(id).value.trim(),m=document.getElementById("xp_m");
+    perfil={nombre:g("xp_n"),negocio:g("xp_neg"),ciudad:g("xp_ciu"),wa:g("xp_wa"),pago:g("xp_pago"),foto};
+    ls.set("cobros_perfil_"+uid,JSON.stringify(perfil));paintTop();dispatchEvent(new Event("perfil"));b.disabled=true;m.textContent="Guardando…";
+    try{await Promise.race([setDoc(doc(db,"perfiles",uid),perfil),new Promise((_,no)=>setTimeout(()=>no({code:"sin respuesta"}),6000))]);m.textContent="Perfil guardado ✓"}
+    catch(x){m.textContent="Se guardó en este celular, pero no se pudo publicar para tus clientes ("+(x.code||"error")+"). Falta actualizar las reglas de Firestore."}
+    b.disabled=false;
+  }
+});
+document.addEventListener("change",async e=>{
+  if(e.target.id!=="xp_f")return;
+  const file=e.target.files[0];e.target.value="";if(!file)return;
+  const av=document.getElementById("xp_av"),m=document.getElementById("xp_m");
+  try{foto=await avatar(file);av.innerHTML='<img src="'+esc(foto)+'" alt="">'}
+  catch(x){m.textContent="No se pudo leer la foto. Elígela desde la galería (formato JPG o PNG)."}
+});
+
+onAuthStateChanged(auth,u=>{
+  uid=u?u.uid:null;perfil={};
+  if(u){
+    try{perfil=JSON.parse(ls.get("cobros_perfil_"+u.uid)||"{}")}catch(x){}
+    getDoc(doc(db,"perfiles",u.uid)).then(d=>{if(d.exists()){perfil=d.data();ls.set("cobros_perfil_"+u.uid,JSON.stringify(perfil));paintTop();dispatchEvent(new Event("perfil"))}}).catch(()=>{});
+  }else closePerfil();
+  paintTop();
+});
+const cid=new URLSearchParams(location.search).get("c");
+if(cid)getDoc(doc(db,"prestamos",cid)).then(s=>s.exists()&&s.data().uid?getDoc(doc(db,"perfiles",s.data().uid)):null).then(d=>{if(d&&d.exists()){lend=d.data();enhance()}}).catch(()=>{});
+obs.observe(R,{childList:true});enhance();
+</script></body></html>
