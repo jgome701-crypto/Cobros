@@ -154,6 +154,8 @@ input{font:inherit;padding:9px;border-radius:8px;border:1px solid var(--bd);back
 .tcard{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin:8px 0}.tc1 b{display:block}.tc1 small{color:var(--mut)}.tc2{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.tc2 .del{color:#ff8a80;border-color:#7a2a2a}
 .tempty{display:grid;justify-items:center;gap:6px;text-align:center;padding:26px 10px;color:var(--mut)}.tempty svg{width:72px;height:72px;color:var(--ac)}.tempty b{color:var(--fg)}
 .mdet{border-bottom:1px solid var(--bd)}.mdet:last-child{border-bottom:0}.mdet>summary{display:flex;align-items:center;gap:12px;padding:12px 14px}.mdet p{margin:0;padding:0 14px 14px;color:var(--mut);font-size:14px}
+.binc>svg,.mdet>summary>svg{width:18px;height:18px;color:var(--ac);flex:none}
+.binc{padding:10px 12px;gap:12px}.binc .mt b{font-size:15px}.binw{width:46px;height:46px}.binw svg{width:26px;height:26px}
 </style></head>
 <body><div id="root"><p class="empty">Cargando…</p></div>
 <script type="module">
@@ -1081,7 +1083,7 @@ $.addEventListener("click",async e=>{
   }
   if(!owner)return;err="";
   if(a==="logout")return signOut(auth);
-  if(a==="nav"){mv="";nav=b.dataset.t;showMas=nav==="mas";showNotif=false;scrollTo(0,0);return view()}
+  if(a==="nav"){mv="";nav=b.dataset.t;showMas=false;showNotif=false;scrollTo(0,0);return view()}
   if(a==="notif"){showNotif=true;return view()}
   if(a==="perfil"){nav="perfil";mv="";datosEdit=false;showNotif=false;scrollTo(0,0);return view()}
   if(a==="mv"){mv=b.dataset.v;datosEdit=false;scrollTo(0,0);return view()}
